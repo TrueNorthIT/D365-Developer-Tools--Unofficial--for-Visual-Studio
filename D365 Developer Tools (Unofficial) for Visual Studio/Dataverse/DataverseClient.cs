@@ -101,16 +101,118 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         }
 
         /// <summary>Returns the MetadataIds of entities contained in the given solution.</summary>
-        public async Task<HashSet<string>> GetSolutionEntityIdsAsync(string solutionId)
+        public Task<HashSet<string>> GetSolutionEntityIdsAsync(string solutionId) =>
+            GetSolutionComponentObjectIdsAsync(solutionId, componentType: 1); // Entity
+
+        /// <summary>Returns the PluginAssemblyIds of plugin assemblies contained in the given solution.</summary>
+        public Task<HashSet<string>> GetSolutionPluginAssemblyIdsAsync(string solutionId) =>
+            GetSolutionComponentObjectIdsAsync(solutionId, componentType: 91); // Plugin Assembly
+
+        private async Task<HashSet<string>> GetSolutionComponentObjectIdsAsync(string solutionId, int componentType)
         {
-            // componenttype 1 = Entity
             var url = ApiUrl(
                 "solutioncomponents",
                 "$select=objectid",
-                $"$filter=_solutionid_value eq '{solutionId}' and componenttype eq 1");
+                $"$filter=_solutionid_value eq '{solutionId}' and componenttype eq {componentType}");
 
             var raw = await FetchPagedAsync<SolutionComponentDto>(url).ConfigureAwait(false);
             return new HashSet<string>(raw.Select(c => c.ObjectId));
+        }
+
+        // ── Plugin assemblies / types / steps / images ──────────────────────────
+
+        public async Task<List<PluginAssemblyDefinition>> GetPluginAssembliesAsync()
+        {
+            var url = ApiUrl(
+                "pluginassemblies",
+                "$select=pluginassemblyid,name,version,isolationmode,sourcetype",
+                "$expand=packageid($select=name,version)");
+
+            var raw = await FetchPagedAsync<PluginAssemblyDto>(url).ConfigureAwait(false);
+
+            return raw
+                .Select(a => new PluginAssemblyDefinition
+                {
+                    PluginAssemblyId = a.PluginAssemblyId,
+                    Name = a.Name,
+                    Version = a.Version,
+                    IsolationMode = PluginOptionLabels.IsolationMode(a.IsolationMode),
+                    SourceType = PluginOptionLabels.SourceType(a.SourceType),
+                    PackageName = a.PackageId?.Name,
+                    PackageVersion = a.PackageId?.Version,
+                })
+                .OrderBy(a => a.Name, StringComparer.Ordinal)
+                .ToList();
+        }
+
+        public async Task<List<PluginTypeDefinition>> GetPluginTypesAsync(string pluginAssemblyId)
+        {
+            var url = ApiUrl(
+                "plugintypes",
+                "$select=plugintypeid,name,friendlyname,typename,isworkflowactivity",
+                $"$filter=_pluginassemblyid_value eq '{pluginAssemblyId}'");
+
+            var raw = await FetchPagedAsync<PluginTypeDto>(url).ConfigureAwait(false);
+
+            return raw
+                .Select(t => new PluginTypeDefinition
+                {
+                    PluginTypeId = t.PluginTypeId,
+                    Name = t.Name,
+                    FriendlyName = t.FriendlyName,
+                    TypeName = t.TypeName,
+                    IsWorkflowActivity = t.IsWorkflowActivity,
+                })
+                .OrderBy(t => t.TypeName, StringComparer.Ordinal)
+                .ToList();
+        }
+
+        public async Task<List<SdkMessageStepDefinition>> GetSdkMessageStepsAsync(string pluginTypeId)
+        {
+            var url = ApiUrl(
+                "sdkmessageprocessingsteps",
+                "$select=sdkmessageprocessingstepid,name,stage,mode,rank,statecode,filteringattributes",
+                $"$filter=_plugintypeid_value eq '{pluginTypeId}'",
+                "$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)",
+                "$orderby=stage,rank");
+
+            var raw = await FetchPagedAsync<SdkMessageStepDto>(url).ConfigureAwait(false);
+
+            return raw
+                .Select(s => new SdkMessageStepDefinition
+                {
+                    StepId = s.SdkMessageProcessingStepId,
+                    Name = s.Name,
+                    MessageName = s.SdkMessageId?.Name,
+                    PrimaryEntity = s.SdkMessageFilterId?.PrimaryObjectTypeCode,
+                    Stage = PluginOptionLabels.Stage(s.Stage),
+                    Mode = PluginOptionLabels.Mode(s.Mode),
+                    Rank = s.Rank,
+                    IsEnabled = s.StateCode == 0,
+                    FilteringAttributes = s.FilteringAttributes,
+                })
+                .ToList();
+        }
+
+        public async Task<List<SdkMessageStepImageDefinition>> GetSdkMessageStepImagesAsync(string stepId)
+        {
+            var url = ApiUrl(
+                "sdkmessageprocessingstepimages",
+                "$select=sdkmessageprocessingstepimageid,name,entityalias,imagetype,attributes",
+                $"$filter=_sdkmessageprocessingstepid_value eq '{stepId}'");
+
+            var raw = await FetchPagedAsync<SdkMessageStepImageDto>(url).ConfigureAwait(false);
+
+            return raw
+                .Select(i => new SdkMessageStepImageDefinition
+                {
+                    ImageId = i.SdkMessageProcessingStepImageId,
+                    Name = i.Name,
+                    EntityAlias = i.EntityAlias,
+                    ImageType = PluginOptionLabels.ImageType(i.ImageType),
+                    Attributes = i.Attributes,
+                })
+                .ToList();
         }
 
         // ── Internals ────────────────────────────────────────────────────────

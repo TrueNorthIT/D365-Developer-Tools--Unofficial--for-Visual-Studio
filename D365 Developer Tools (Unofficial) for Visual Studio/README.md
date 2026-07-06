@@ -10,6 +10,7 @@ VS Code extension, adapted for C#/early-bound Dataverse development instead of T
 
 - [Features](#features)
   - [Entity Explorer](#entity-explorer)
+  - [Plugin Explorer](#plugin-explorer)
   - [C# Class Generation](#c-class-generation)
   - [Enum Generation](#enum-generation)
   - [IntelliSense Integration](#intellisense-integration)
@@ -30,6 +31,21 @@ Dataverse environment and lets you browse its metadata.
 - Expand any entity to see its attributes, types, and whether each field is the primary ID or primary name
 - Right-click an entity to generate an early-bound C# class
 - Right-click a Picklist, State, or Status field to generate a standalone enum
+
+### Plugin Explorer
+
+A tool window (**Tools → D365 Developer Tools → D365: Show Plugin Explorer**) for browsing registered
+plugin assemblies, similar to the Plugin Registration Tool.
+
+- Lists all plugin assemblies, searchable by name, with their version, isolation mode, and — for
+  assemblies deployed as part of a NuGet-style plugin package — the package name
+- Filter the list down to a specific solution
+- Expand an assembly to see its plugin types (and whether each is a workflow activity)
+- Expand a plugin type to see its registered steps — message, target entity, stage, and execution mode,
+  with disabled steps shown dimmed
+- Expand a step to see its registered pre-/post-images
+
+This is a read-only browsing tool — it doesn't register, update, or deploy plugins.
 
 ### C# Class Generation
 
@@ -178,6 +194,7 @@ Everything lives under **Tools → D365 Developer Tools**:
 |---|---|
 | D365: Connect / Manage Connection… | Opens the connect/disconnect/switch-account/recent-environments picker |
 | D365: Show Entity Explorer | Opens the Entity Explorer tool window |
+| D365: Show Plugin Explorer | Opens the Plugin Explorer tool window |
 | D365: Configure MCP Server for this Solution | Wires up Claude Code's `.mcp.json` for the open solution |
 
 ## Requirements

@@ -27,6 +27,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuids.D365DeveloperToolsPackageString)]
     [ProvideToolWindow(typeof(EntityExplorerToolWindow), Style = VsDockStyle.Tabbed, Window = ToolWindowGuids80.SolutionExplorer)]
+    [ProvideToolWindow(typeof(PluginExplorerToolWindow), Style = VsDockStyle.Tabbed, Window = ToolWindowGuids80.SolutionExplorer)]
     [ProvideAutoLoad(UIContextGuids80.NoSolution, PackageAutoLoadFlags.BackgroundLoad)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.SolutionExists_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class D365DeveloperToolsPackage : AsyncPackage
@@ -129,6 +130,16 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
             if (window?.Frame == null)
             {
                 throw new NotSupportedException("Cannot create the D365 Entity Explorer tool window.");
+            }
+        }
+
+        /// <summary>Public wrapper around the protected AsyncPackage.ShowToolWindowAsync, for the Extensibility-model commands.</summary>
+        internal async Task ShowPluginExplorerToolWindowAsync()
+        {
+            var window = await ShowToolWindowAsync(typeof(PluginExplorerToolWindow), 0, create: true, cancellationToken: DisposalToken).ConfigureAwait(true);
+            if (window?.Frame == null)
+            {
+                throw new NotSupportedException("Cannot create the D365 Plugin Explorer tool window.");
             }
         }
 
