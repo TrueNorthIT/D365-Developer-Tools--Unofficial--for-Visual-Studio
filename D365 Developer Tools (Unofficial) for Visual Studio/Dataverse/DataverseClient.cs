@@ -125,24 +125,43 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         {
             var url = ApiUrl(
                 "pluginassemblies",
-                "$select=pluginassemblyid,name,version,isolationmode,sourcetype",
-                "$expand=packageid($select=name,version)");
+                "$select=pluginassemblyid,name,version,isolationmode,sourcetype,_packageid_value");
 
             var raw = await FetchPagedAsync<PluginAssemblyDto>(url).ConfigureAwait(false);
 
+            var packageIds = raw.Where(a => a.PackageIdValue != null).Select(a => a.PackageIdValue).Distinct().ToList();
+            var packages = packageIds.Count > 0
+                ? await GetPluginPackagesByIdAsync(packageIds).ConfigureAwait(false)
+                : new Dictionary<string, PluginPackageDto>();
+
             return raw
-                .Select(a => new PluginAssemblyDefinition
+                .Select(a =>
                 {
-                    PluginAssemblyId = a.PluginAssemblyId,
-                    Name = a.Name,
-                    Version = a.Version,
-                    IsolationMode = PluginOptionLabels.IsolationMode(a.IsolationMode),
-                    SourceType = PluginOptionLabels.SourceType(a.SourceType),
-                    PackageName = a.PackageId?.Name,
-                    PackageVersion = a.PackageId?.Version,
+                    PluginPackageDto package = null;
+                    if (a.PackageIdValue != null) { packages.TryGetValue(a.PackageIdValue, out package); }
+
+                    return new PluginAssemblyDefinition
+                    {
+                        PluginAssemblyId = a.PluginAssemblyId,
+                        Name = a.Name,
+                        Version = a.Version,
+                        IsolationMode = PluginOptionLabels.IsolationMode(a.IsolationMode),
+                        SourceType = PluginOptionLabels.SourceType(a.SourceType),
+                        PackageName = package?.Name,
+                        PackageVersion = package?.Version,
+                    };
                 })
                 .OrderBy(a => a.Name, StringComparer.Ordinal)
                 .ToList();
+        }
+
+        private async Task<Dictionary<string, PluginPackageDto>> GetPluginPackagesByIdAsync(List<string> packageIds)
+        {
+            var filter = string.Join(" or ", packageIds.Select(id => $"pluginpackageid eq '{id}'"));
+            var url = ApiUrl("pluginpackages", "$select=pluginpackageid,name,version", $"$filter={filter}");
+
+            var raw = await FetchPagedAsync<PluginPackageDto>(url).ConfigureAwait(false);
+            return raw.ToDictionary(p => p.PluginPackageId, p => p);
         }
 
         public async Task<List<PluginTypeDefinition>> GetPluginTypesAsync(string pluginAssemblyId)
@@ -171,20 +190,29 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         {
             var url = ApiUrl(
                 "sdkmessageprocessingsteps",
-                "$select=sdkmessageprocessingstepid,name,stage,mode,rank,statecode,filteringattributes",
+                "$select=sdkmessageprocessingstepid,name,stage,mode,rank,statecode,filteringattributes,_sdkmessageid_value,_sdkmessagefilterid_value",
                 $"$filter=_plugintypeid_value eq '{pluginTypeId}'",
-                "$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)",
                 "$orderby=stage,rank");
 
             var raw = await FetchPagedAsync<SdkMessageStepDto>(url).ConfigureAwait(false);
+
+            var messageIds = raw.Where(s => s.SdkMessageIdValue != null).Select(s => s.SdkMessageIdValue).Distinct().ToList();
+            var messageNames = messageIds.Count > 0
+                ? await GetSdkMessageNamesByIdAsync(messageIds).ConfigureAwait(false)
+                : new Dictionary<string, string>();
+
+            var filterIds = raw.Where(s => s.SdkMessageFilterIdValue != null).Select(s => s.SdkMessageFilterIdValue).Distinct().ToList();
+            var filterEntities = filterIds.Count > 0
+                ? await GetSdkMessageFilterEntitiesByIdAsync(filterIds).ConfigureAwait(false)
+                : new Dictionary<string, string>();
 
             return raw
                 .Select(s => new SdkMessageStepDefinition
                 {
                     StepId = s.SdkMessageProcessingStepId,
                     Name = s.Name,
-                    MessageName = s.SdkMessageId?.Name,
-                    PrimaryEntity = s.SdkMessageFilterId?.PrimaryObjectTypeCode,
+                    MessageName = s.SdkMessageIdValue != null && messageNames.TryGetValue(s.SdkMessageIdValue, out var messageName) ? messageName : null,
+                    PrimaryEntity = s.SdkMessageFilterIdValue != null && filterEntities.TryGetValue(s.SdkMessageFilterIdValue, out var entity) ? entity : null,
                     Stage = PluginOptionLabels.Stage(s.Stage),
                     Mode = PluginOptionLabels.Mode(s.Mode),
                     Rank = s.Rank,
@@ -192,6 +220,24 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                     FilteringAttributes = s.FilteringAttributes,
                 })
                 .ToList();
+        }
+
+        private async Task<Dictionary<string, string>> GetSdkMessageNamesByIdAsync(List<string> sdkMessageIds)
+        {
+            var filter = string.Join(" or ", sdkMessageIds.Select(id => $"sdkmessageid eq '{id}'"));
+            var url = ApiUrl("sdkmessages", "$select=sdkmessageid,name", $"$filter={filter}");
+
+            var raw = await FetchPagedAsync<SdkMessageDto>(url).ConfigureAwait(false);
+            return raw.ToDictionary(m => m.SdkMessageId, m => m.Name);
+        }
+
+        private async Task<Dictionary<string, string>> GetSdkMessageFilterEntitiesByIdAsync(List<string> sdkMessageFilterIds)
+        {
+            var filter = string.Join(" or ", sdkMessageFilterIds.Select(id => $"sdkmessagefilterid eq '{id}'"));
+            var url = ApiUrl("sdkmessagefilters", "$select=sdkmessagefilterid,primaryobjecttypecode", $"$filter={filter}");
+
+            var raw = await FetchPagedAsync<SdkMessageFilterDto>(url).ConfigureAwait(false);
+            return raw.ToDictionary(f => f.SdkMessageFilterId, f => f.PrimaryObjectTypeCode);
         }
 
         public async Task<List<SdkMessageStepImageDefinition>> GetSdkMessageStepImagesAsync(string stepId)
