@@ -17,7 +17,6 @@ VS Code extension, adapted for C#/early-bound Dataverse development instead of T
   - [Claude / AI Integration (MCP Server)](#claude--ai-integration-mcp-server)
 - [Extensions Menu](#extensions-menu)
 - [Requirements](#requirements)
-- [Known Limitations](#known-limitations)
 
 ## Features
 
@@ -189,14 +188,3 @@ Everything lives under **Tools → D365 Developer Tools**:
 - For client credentials auth: an Azure AD app registration with a client secret and appropriate
   Dataverse permissions
 - .NET 8 runtime (required for the bundled MCP server)
-
-## Known Limitations
-
-This is a from-scratch C# port of a companion VS Code extension, focused on the core browsing and
-code-generation workflow. Not yet included:
-
-- Web resource publish/compare
-- The `// @d365 <entity>` comment + lightbulb generation trigger (only the "type `d365`" completion
-  path is implemented)
-- If no solution is open, connections are session-only and aren't remembered between restarts, and the
-  MCP server can't be configured (there's nowhere to write `.mcp.json`)
