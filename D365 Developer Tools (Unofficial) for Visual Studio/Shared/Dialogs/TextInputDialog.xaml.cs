@@ -1,11 +1,12 @@
 using System;
 using System.Windows;
 using System.Windows.Interop;
+using Microsoft.VisualStudio.PlatformUI;
 
 namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs
 {
     /// <summary>Modal replacement for vscode.window.showInputBox.</summary>
-    internal partial class TextInputDialog : Window
+    internal partial class TextInputDialog : DialogWindow
     {
         public string Value { get; private set; }
 

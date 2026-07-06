@@ -3,11 +3,17 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:conv="clr-namespace:D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Converters"
              xmlns:dlg="clr-namespace:D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs"
+             xmlns:vsp="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
              d:DesignHeight="500" d:DesignWidth="320">
     <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Shared/Styles/ThemedControls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
         <conv:BoolToVisibilityConverter x:Key="BoolToVisibleConverter" />
         <conv:PrimaryMarkerConverter x:Key="PrimaryMarkerConverter" />
         <dlg:EmptyToCollapsedConverter x:Key="EmptyToCollapsedConverter" />
@@ -46,9 +52,11 @@
                 <TextBlock Grid.Column="1" Margin="6,0,0,0" Opacity="0.6" FontSize="11" Text="{Binding LogicalName}" />
             </Grid>
         </HierarchicalDataTemplate>
+        </ResourceDictionary>
     </UserControl.Resources>
 
-    <Grid>
+    <Grid Background="{DynamicResource {x:Static vsp:EnvironmentColors.ToolWindowBackgroundBrushKey}}"
+          TextElement.Foreground="{DynamicResource {x:Static vsp:EnvironmentColors.ToolWindowTextBrushKey}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -112,15 +120,15 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Margin="8,4" Foreground="Red" TextWrapping="Wrap"
+                <TextBlock Grid.Row="0" Margin="8,4" TextWrapping="Wrap"
+                           Foreground="{DynamicResource {x:Static vsp:EnvironmentColors.ToolWindowValidationErrorTextBrushKey}}"
                            Text="{Binding LoadError}" Visibility="{Binding LoadError, Converter={StaticResource EmptyToCollapsedConverter}}" />
                 <TextBlock Grid.Row="0" Margin="8,4" Text="Loading entities…"
                            Visibility="{Binding IsLoadingEntities, Converter={StaticResource BoolToVisibleConverter}}" />
 
-                <TreeView x:Name="EntityTree" Grid.Row="1" ItemsSource="{Binding EntitiesView}" ItemTemplate="{StaticResource EntityTemplate}"
-                          BorderThickness="0" Background="Transparent">
+                <TreeView x:Name="EntityTree" Grid.Row="1" ItemsSource="{Binding EntitiesView}" ItemTemplate="{StaticResource EntityTemplate}">
                     <TreeView.ItemContainerStyle>
-                        <Style TargetType="TreeViewItem">
+                        <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
                             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
                         </Style>
                     </TreeView.ItemContainerStyle>

@@ -8,11 +8,12 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Interop;
+using Microsoft.VisualStudio.PlatformUI;
 
 namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs
 {
     /// <summary>Modal replacement for vscode.window.showQuickPick (single- and multi-select modes).</summary>
-    internal partial class QuickPickDialog : Window
+    internal partial class QuickPickDialog : DialogWindow
     {
         private readonly ObservableCollection<PickRowViewModel> _allRows = new ObservableCollection<PickRowViewModel>();
         private readonly ICollectionView _view;
