@@ -4,6 +4,8 @@
              xmlns:conv="clr-namespace:D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Converters"
              xmlns:dlg="clr-namespace:D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs"
              xmlns:vsp="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
+             xmlns:img="clr-namespace:Microsoft.VisualStudio.Imaging;assembly=Microsoft.VisualStudio.Imaging"
+             xmlns:catalog="clr-namespace:Microsoft.VisualStudio.Imaging;assembly=Microsoft.VisualStudio.ImageCatalog"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
@@ -16,43 +18,50 @@
 
         <conv:BoolToVisibilityConverter x:Key="BoolToVisibleConverter" />
         <conv:BoolToOpacityConverter x:Key="BoolToOpacityConverter" />
+        <conv:BoolToAssemblyIconConverter x:Key="BoolToAssemblyIconConverter" />
         <dlg:EmptyToCollapsedConverter x:Key="EmptyToCollapsedConverter" />
 
         <DataTemplate x:Key="ImageTemplate">
             <Grid Margin="0,1">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <Border Grid.Column="0" Background="#332D7DD2" CornerRadius="2" Padding="3,0" Margin="0,0,4,0">
+                <img:CrispImage Grid.Column="0" Width="16" Height="16" Margin="0,0,4,0" VerticalAlignment="Center" Moniker="{x:Static catalog:KnownMonikers.ImageIcon}" />
+                <Border Grid.Column="1" Background="#332D7DD2" CornerRadius="2" Padding="3,0" Margin="0,0,4,0">
                     <TextBlock FontSize="10" Text="{Binding ImageType}" />
                 </Border>
-                <TextBlock Grid.Column="1" Text="{Binding EntityAlias}" TextTrimming="CharacterEllipsis" />
-                <TextBlock Grid.Column="2" Margin="6,0,0,0" Opacity="0.6" FontSize="10" Text="{Binding Name}" />
+                <TextBlock Grid.Column="2" Text="{Binding EntityAlias}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="3" Margin="6,0,0,0" Opacity="0.6" FontSize="10" Text="{Binding Name}" />
             </Grid>
         </DataTemplate>
 
         <HierarchicalDataTemplate x:Key="StepTemplate" ItemsSource="{Binding Images}" ItemTemplate="{StaticResource ImageTemplate}">
             <Grid Margin="0,1" Opacity="{Binding IsEnabled, Converter={StaticResource BoolToOpacityConverter}}">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{Binding Summary}" TextTrimming="CharacterEllipsis"
+                <img:CrispImage Grid.Column="0" Width="16" Height="16" Margin="0,0,4,0" VerticalAlignment="Center" Moniker="{x:Static catalog:KnownMonikers.Event}" />
+                <TextBlock Grid.Column="1" Text="{Binding Summary}" TextTrimming="CharacterEllipsis"
                            ToolTip="{Binding FilteringAttributes}" />
-                <TextBlock Grid.Column="1" Margin="6,0,0,0" Opacity="0.6" FontSize="10" Text="{Binding Mode}" />
+                <TextBlock Grid.Column="2" Margin="6,0,0,0" Opacity="0.6" FontSize="10" Text="{Binding Mode}" />
             </Grid>
         </HierarchicalDataTemplate>
 
         <HierarchicalDataTemplate x:Key="TypeTemplate" ItemsSource="{Binding Steps}" ItemTemplate="{StaticResource StepTemplate}">
             <Grid Margin="0,2">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
-                <TextBlock Grid.Column="1" Margin="6,0,0,0" Opacity="0.6" FontSize="11" Text="Workflow Activity"
+                <img:CrispImage Grid.Column="0" Width="16" Height="16" Margin="0,0,4,0" VerticalAlignment="Center" Moniker="{x:Static catalog:KnownMonikers.ClassPublic}" />
+                <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
+                <TextBlock Grid.Column="2" Margin="6,0,0,0" Opacity="0.6" FontSize="11" Text="Workflow Activity"
                            Visibility="{Binding IsWorkflowActivity, Converter={StaticResource BoolToVisibleConverter}}" />
             </Grid>
         </HierarchicalDataTemplate>
@@ -60,11 +69,14 @@
         <HierarchicalDataTemplate x:Key="AssemblyTemplate" ItemsSource="{Binding Types}" ItemTemplate="{StaticResource TypeTemplate}">
             <Grid Margin="0,2">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <img:CrispImage Grid.Column="0" Width="16" Height="16" Margin="0,0,4,0" VerticalAlignment="Center"
+                                Moniker="{Binding HasPackage, Converter={StaticResource BoolToAssemblyIconConverter}}" />
+                <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
                     <TextBlock Margin="6,0,0,0" Opacity="0.6" FontSize="11" Text="{Binding PackageName}"
                                Visibility="{Binding HasPackage, Converter={StaticResource BoolToVisibleConverter}}" />
                     <TextBlock Margin="6,0,0,0" Opacity="0.6" FontSize="11" Text="{Binding Version}" />
