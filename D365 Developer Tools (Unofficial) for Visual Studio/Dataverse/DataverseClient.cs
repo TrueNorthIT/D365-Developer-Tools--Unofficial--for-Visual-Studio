@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Connection;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse.Dto;
@@ -261,6 +262,65 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                 .ToList();
         }
 
+        // ── Publishing plugin assemblies / packages ─────────────────────────────
+
+        public async Task<PluginRecordRef> FindPluginAssemblyByNameAsync(string name)
+        {
+            var url = ApiUrl("pluginassemblies", "$select=pluginassemblyid,version", $"$filter=name eq '{EscapeODataLiteral(name)}'");
+            var raw = await FetchPagedAsync<PluginAssemblyLookupDto>(url).ConfigureAwait(false);
+            var match = raw.FirstOrDefault();
+            return match == null ? null : new PluginRecordRef { Id = match.PluginAssemblyId, Version = match.Version };
+        }
+
+        public async Task<PluginRecordRef> FindPluginPackageByNameAsync(string name)
+        {
+            var url = ApiUrl("pluginpackages", "$select=pluginpackageid,version", $"$filter=name eq '{EscapeODataLiteral(name)}'");
+            var raw = await FetchPagedAsync<PluginPackageLookupDto>(url).ConfigureAwait(false);
+            var match = raw.FirstOrDefault();
+            return match == null ? null : new PluginRecordRef { Id = match.PluginPackageId, Version = match.Version };
+        }
+
+        /// <summary>Creates a new PluginAssembly record. Isolation mode defaults to Sandbox, matching Dataverse's own default for new registrations.</summary>
+        public Task<string> CreatePluginAssemblyAsync(string name, string contentBase64, string version, string solutionUniqueName) =>
+            CreateRecordAsync("pluginassemblies", new
+            {
+                name,
+                content = contentBase64,
+                version,
+                isolationmode = 2, // Sandbox
+                sourcetype = 0, // Database
+            }, solutionUniqueName);
+
+        public Task UpdatePluginAssemblyContentAsync(string pluginAssemblyId, string contentBase64, string version) =>
+            UpdateRecordAsync("pluginassemblies", pluginAssemblyId, new { content = contentBase64, version });
+
+        public Task<string> CreatePluginPackageAsync(string name, string contentBase64, string version, string solutionUniqueName) =>
+            CreateRecordAsync("pluginpackages", new
+            {
+                name,
+                content = contentBase64,
+                version,
+            }, solutionUniqueName);
+
+        public Task UpdatePluginPackageContentAsync(string pluginPackageId, string contentBase64, string version) =>
+            UpdateRecordAsync("pluginpackages", pluginPackageId, new { content = contentBase64, version });
+
+        public async Task<HashSet<string>> GetExistingPluginTypeNamesAsync(string pluginAssemblyId)
+        {
+            var url = ApiUrl("plugintypes", "$select=typename", $"$filter=_pluginassemblyid_value eq '{pluginAssemblyId}'");
+            var raw = await FetchPagedAsync<PluginTypeNameDto>(url).ConfigureAwait(false);
+            return new HashSet<string>(raw.Select(t => t.TypeName), StringComparer.OrdinalIgnoreCase);
+        }
+
+        public Task<string> CreatePluginTypeAsync(string pluginAssemblyId, string typeName, string friendlyName, string solutionUniqueName) =>
+            CreateRecordAsync("plugintypes", new Dictionary<string, object>
+            {
+                ["typename"] = typeName,
+                ["friendlyname"] = friendlyName,
+                ["name"] = typeName,
+                ["pluginassemblyid@odata.bind"] = $"/pluginassemblies({pluginAssemblyId})",
+            }, solutionUniqueName);
+
         // ── Internals ────────────────────────────────────────────────────────
 
         private string ApiUrl(string resource, params string[] queryParts)
@@ -287,31 +347,76 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
 
         private async Task<T> RequestAsync<T>(string url, HttpMethod method = null, object body = null)
         {
-            var token = await _connectionManager.GetAccessTokenAsync().ConfigureAwait(false);
-
-            using (var request = new HttpRequestMessage(method ?? HttpMethod.Get, url))
+            using (var response = await SendAsync(url, method ?? HttpMethod.Get, body, null).ConfigureAwait(false))
             {
-                request.Headers.Add("Authorization", $"Bearer {token}");
-                request.Headers.Add("OData-MaxVersion", "4.0");
-                request.Headers.Add("OData-Version", "4.0");
-                request.Headers.Add("Accept", "application/json");
-
-                if (body != null)
-                {
-                    request.Content = new StringContent(JsonConvert.SerializeObject(body), System.Text.Encoding.UTF8, "application/json");
-                }
-
-                using (var response = await Http.SendAsync(request).ConfigureAwait(false))
-                {
-                    var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        throw new InvalidOperationException($"Dataverse API error {(int)response.StatusCode}: {(string.IsNullOrEmpty(text) ? response.ReasonPhrase : text)}");
-                    }
-
-                    return string.IsNullOrEmpty(text) ? default : JsonConvert.DeserializeObject<T>(text);
-                }
+                var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                return string.IsNullOrEmpty(text) ? default : JsonConvert.DeserializeObject<T>(text);
             }
         }
+
+        /// <summary>Creates a record and returns its new ID, parsed from the OData-EntityId response header (Dataverse returns 204 No Content on create).</summary>
+        private async Task<string> CreateRecordAsync(string entitySetName, object body, string solutionUniqueName)
+        {
+            var headers = string.IsNullOrEmpty(solutionUniqueName)
+                ? null
+                : new Dictionary<string, string> { ["MSCRM.SolutionUniqueName"] = solutionUniqueName };
+
+            using (var response = await SendAsync(ApiUrl(entitySetName), HttpMethod.Post, body, headers).ConfigureAwait(false))
+            {
+                if (!response.Headers.TryGetValues("OData-EntityId", out var values))
+                {
+                    throw new InvalidOperationException("Dataverse did not return an OData-EntityId header for the created record.");
+                }
+
+                var match = Regex.Match(values.First(), @"\(([0-9a-fA-F-]{36})\)");
+                if (!match.Success)
+                {
+                    throw new InvalidOperationException($"Could not parse the created record's ID from: {values.First()}");
+                }
+
+                return match.Groups[1].Value;
+            }
+        }
+
+        private async Task UpdateRecordAsync(string entitySetName, string id, object body)
+        {
+            using (await SendAsync($"{ApiUrl(entitySetName)}({id})", new HttpMethod("PATCH"), body, null).ConfigureAwait(false))
+            {
+                // Dataverse returns 204 No Content on a successful update; nothing further to read.
+            }
+        }
+
+        private async Task<HttpResponseMessage> SendAsync(string url, HttpMethod method, object body, IDictionary<string, string> extraHeaders)
+        {
+            var token = await _connectionManager.GetAccessTokenAsync().ConfigureAwait(false);
+
+            var request = new HttpRequestMessage(method, url);
+            request.Headers.Add("Authorization", $"Bearer {token}");
+            request.Headers.Add("OData-MaxVersion", "4.0");
+            request.Headers.Add("OData-Version", "4.0");
+            request.Headers.Add("Accept", "application/json");
+
+            if (extraHeaders != null)
+            {
+                foreach (var header in extraHeaders) { request.Headers.Add(header.Key, header.Value); }
+            }
+
+            if (body != null)
+            {
+                request.Content = new StringContent(JsonConvert.SerializeObject(body), System.Text.Encoding.UTF8, "application/json");
+            }
+
+            var response = await Http.SendAsync(request).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                response.Dispose();
+                throw new InvalidOperationException($"Dataverse API error {(int)response.StatusCode}: {(string.IsNullOrEmpty(text) ? response.ReasonPhrase : text)}");
+            }
+
+            return response;
+        }
+
+        private static string EscapeODataLiteral(string value) => value?.Replace("'", "''");
     }
 }

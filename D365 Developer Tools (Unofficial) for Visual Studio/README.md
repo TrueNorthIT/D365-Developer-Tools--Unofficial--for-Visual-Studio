@@ -11,6 +11,7 @@ VS Code extension, adapted for C#/early-bound Dataverse development instead of T
 - [Features](#features)
   - [Entity Explorer](#entity-explorer)
   - [Plugin Explorer](#plugin-explorer)
+  - [Publish to Dataverse](#publish-to-dataverse)
   - [C# Class Generation](#c-class-generation)
   - [Enum Generation](#enum-generation)
   - [IntelliSense Integration](#intellisense-integration)
@@ -45,7 +46,28 @@ plugin assemblies, similar to the Plugin Registration Tool.
   with disabled steps shown dimmed
 - Expand a step to see its registered pre-/post-images
 
-This is a read-only browsing tool — it doesn't register, update, or deploy plugins.
+Browsing here is read-only — for deploying a plugin project's own output, see [Publish to Dataverse](#publish-to-dataverse) below.
+
+### Publish to Dataverse
+
+Right-click a project in Solution Explorer and choose **D365: Publish to Dataverse...** to build and
+deploy it without leaving Visual Studio.
+
+1. Builds the project (Release configuration).
+2. Looks for an existing Plugin Assembly or Plugin Package in the connected environment with the same
+   name as the built assembly.
+   - **Found** — uploads the new build to it. If it's a traditional plugin assembly, the build is also
+     scanned for `IPlugin` implementations and any newly added ones are registered as Plugin Types
+     (existing ones are left alone, so registered steps are never disturbed).
+   - **Not found (first publish)** — the first time you publish a given project, you'll be asked which
+     deployment model to use:
+     - **Traditional Plugin Assembly** — uploads the .dll to a Plugin Assembly record, then registers a
+       Plugin Type for each `IPlugin` implementation it finds.
+     - **NuGet-style Plugin Package** — uploads to a Plugin Package record; Dataverse derives the
+       plugin types from the package itself.
+
+     Your choice is remembered for that project, and you'll then be asked whether to add the new
+     record to a solution (picked from a list of your Dataverse solutions).
 
 ### C# Class Generation
 

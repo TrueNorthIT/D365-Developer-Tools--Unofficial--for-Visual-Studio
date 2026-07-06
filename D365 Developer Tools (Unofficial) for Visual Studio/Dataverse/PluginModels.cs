@@ -49,6 +49,13 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         public string Attributes { get; set; }
     }
 
+    /// <summary>Identifies an existing PluginAssembly or PluginPackage record found by name.</summary>
+    internal sealed class PluginRecordRef
+    {
+        public string Id { get; set; }
+        public string Version { get; set; }
+    }
+
     /// <summary>Maps the raw numeric option-set values Dataverse returns for plugin metadata to their labels.</summary>
     internal static class PluginOptionLabels
     {

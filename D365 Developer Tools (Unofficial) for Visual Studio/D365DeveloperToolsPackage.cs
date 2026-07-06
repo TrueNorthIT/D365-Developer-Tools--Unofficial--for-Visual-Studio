@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.Design;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,6 +29,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
     [Guid(PackageGuids.D365DeveloperToolsPackageString)]
     [ProvideToolWindow(typeof(EntityExplorerToolWindow), Style = VsDockStyle.Tabbed, Window = ToolWindowGuids80.SolutionExplorer)]
     [ProvideToolWindow(typeof(PluginExplorerToolWindow), Style = VsDockStyle.Tabbed, Window = ToolWindowGuids80.SolutionExplorer)]
+    [ProvideMenuResource("Menus.ctmenu", 1)]
     [ProvideAutoLoad(UIContextGuids80.NoSolution, PackageAutoLoadFlags.BackgroundLoad)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.SolutionExists_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class D365DeveloperToolsPackage : AsyncPackage
@@ -112,6 +114,12 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
                 // Covers the case where the package finishes loading after a solution is already open.
                 ConnectionManager.TryRestoreConnectionAsync().FileAndForget("D365DeveloperTools/RestoreConnectionOnActivate");
 
+                if (await GetServiceAsync(typeof(IMenuCommandService)).ConfigureAwait(true) is OleMenuCommandService commandService)
+                {
+                    var publishCommandId = new CommandID(PackageGuids.ProjectContextMenuCmdSet, PkgCmdIDList.cmdidPublishToDataverse);
+                    commandService.AddCommand(new OleMenuCommand(OnPublishToDataverse, publishCommandId));
+                }
+
                 ActivityLog.LogInformation("D365DeveloperTools", "InitializeAsync: completed successfully");
                 _initialized.TrySetResult(true);
             }
@@ -141,6 +149,23 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
             {
                 throw new NotSupportedException("Cannot create the D365 Plugin Explorer tool window.");
             }
+        }
+
+        /// <summary>Handles the "D365: Publish to Dataverse..." Solution Explorer project context menu command.</summary>
+        private void OnPublishToDataverse(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            if (!(GetService(typeof(EnvDTE.DTE)) is EnvDTE.DTE dte)) { return; }
+
+            var selectedItems = dte.SelectedItems;
+            if (selectedItems == null || selectedItems.Count == 0) { return; }
+
+            var project = selectedItems.Item(1).Project;
+            if (project == null) { return; }
+
+            Commands.PublishToDataverseCommand.ExecuteAsync(dte, project)
+                .FileAndForget("D365DeveloperTools/PublishToDataverse");
         }
 
         protected override void Dispose(bool disposing)

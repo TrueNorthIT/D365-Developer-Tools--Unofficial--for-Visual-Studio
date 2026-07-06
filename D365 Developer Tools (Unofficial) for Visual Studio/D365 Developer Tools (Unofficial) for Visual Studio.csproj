@@ -42,6 +42,14 @@
     <Reference Include="System.Net.Http" />
   </ItemGroup>
 
+  <!-- Classic VSCT registration for the Solution Explorer project-node context menu (see Guids.cs's
+       ProjectContextMenuCmdSetString comment for why this can't use the new Extensibility model). -->
+  <ItemGroup>
+    <VSCTCompile Include="ProjectContextMenu.vsct">
+      <ResourceName>Menus.ctmenu</ResourceName>
+    </VSCTCompile>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.0.32112.339" ExcludeAssets="runtime" NoWarn="NU1604" />
     <PackageReference Include="Microsoft.VisualStudio.Extensibility.Sdk" Version="17.14.40608" PrivateAssets="all" />
@@ -50,6 +58,7 @@
     <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.61.3" />
     <PackageReference Include="Microsoft.Identity.Client.Desktop" Version="4.61.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="8.0.0" />
   </ItemGroup>
 
   <!-- The MCP server is a standalone .NET 8 console app (it hosts the MCP C# SDK, which targets a
