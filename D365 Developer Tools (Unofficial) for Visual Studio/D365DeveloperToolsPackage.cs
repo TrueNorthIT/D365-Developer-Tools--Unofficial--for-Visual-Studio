@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Connection;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse;
+using D365_Developer_Tools__Unofficial__for_Visual_Studio.Mcp;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows;
@@ -43,6 +44,8 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
         internal ConnectionManager ConnectionManager { get; private set; }
         internal DataverseClient DataverseClient { get; private set; }
         internal IUserPrompts UserPrompts { get; private set; }
+
+        private McpBridge _mcpBridge;
 
         public D365DeveloperToolsPackage()
         {
@@ -98,6 +101,13 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
                 ConnectionManager = new ConnectionManager(UserPrompts, _solutionContext);
                 DataverseClient = new DataverseClient(ConnectionManager);
 
+                _mcpBridge = new McpBridge(ConnectionManager);
+                ConnectionManager.ConnectionChanged += (_, connection) =>
+                {
+                    if (connection != null) { _mcpBridge.Start(); }
+                    else { _mcpBridge.Stop(); }
+                };
+
                 // Covers the case where the package finishes loading after a solution is already open.
                 ConnectionManager.TryRestoreConnectionAsync().FileAndForget("D365DeveloperTools/RestoreConnectionOnActivate");
 
@@ -126,6 +136,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
         {
             if (disposing)
             {
+                _mcpBridge?.Dispose();
                 ConnectionManager?.Dispose();
                 if (_solutionContext != null && ThreadHelper.CheckAccess())
                 {

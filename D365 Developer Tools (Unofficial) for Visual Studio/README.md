@@ -14,6 +14,7 @@ VS Code extension, adapted for C#/early-bound Dataverse development instead of T
   - [Enum Generation](#enum-generation)
   - [IntelliSense Integration](#intellisense-integration)
   - [Connection Management](#connection-management)
+  - [Claude / AI Integration (MCP Server)](#claude--ai-integration-mcp-server)
 - [Extensions Menu](#extensions-menu)
 - [Requirements](#requirements)
 - [Known Limitations](#known-limitations)
@@ -125,6 +126,51 @@ Authentication options:
 | User account | Interactive sign-in with your own Microsoft/Entra credentials, via Microsoft's published multitenant "XRM Tooling" client application — no Azure AD app registration required |
 | Client credentials | App-only, using an Azure AD client ID and secret (stored using Windows DPAPI, scoped to your Windows user account) |
 
+### Claude / AI Integration (MCP Server)
+
+The extension ships an MCP (Model Context Protocol) server so Claude can query your live Dataverse
+schema while helping you write C# code. When the server is running, Claude can look up entity shapes,
+field types, and option set values in real time — no copy-pasting schema details into the chat.
+
+#### Available tools
+
+| Tool | Description |
+|---|---|
+| `list_entities` | List all entities, optionally filtered to a solution |
+| `get_entity_attributes` | Get all fields for an entity with their types |
+| `get_option_values` | Get the numeric values and labels for a Picklist, State, or Status field |
+| `generate_class` | Generate an early-bound C# class (with auto-generated enums for option set fields) |
+| `generate_enum` | Generate a C# `enum` for a single option set field |
+
+#### Setup
+
+No credentials needed — the MCP server uses your existing Visual Studio session. Configuration is
+opt-in per solution.
+
+1. **Connect** via **Tools → D365 Developer Tools → D365: Connect / Manage Connection…**
+2. **Run D365: Configure MCP Server for this Solution** from the same Tools menu. This writes (or
+   merges into) `.mcp.json` next to your `.sln` file, pointing Claude Code at the MCP server bundled
+   with the extension. A dialog confirms when this happens.
+3. **Restart Claude Code** so it picks up the new `.mcp.json`.
+4. **Run `/mcp`** in Claude Code to confirm the `d365` server is listed as connected.
+
+That's it. The extension starts a local token-vending bridge (`%LocalAppData%\D365DeveloperTools\mcp-bridge.json`)
+whenever you're connected; the MCP server reads from it so Claude always has a fresh token without
+storing any credentials.
+
+> If the `d365` server shows as disconnected in `/mcp`, make sure D365 Developer Tools is connected in
+> Visual Studio first.
+
+#### Example usage
+
+Once connected, Claude can answer questions like:
+
+> *"Generate a C# class for the `lead` entity, only including the name, status, owner, and created
+> date fields."*
+
+Claude will call `get_entity_attributes` and `generate_class` against your live environment and return
+ready-to-use code.
+
 ## Extensions Menu
 
 Everything lives under **Tools → D365 Developer Tools**:
@@ -133,6 +179,7 @@ Everything lives under **Tools → D365 Developer Tools**:
 |---|---|
 | D365: Connect / Manage Connection… | Opens the connect/disconnect/switch-account/recent-environments picker |
 | D365: Show Entity Explorer | Opens the Entity Explorer tool window |
+| D365: Configure MCP Server for this Solution | Wires up Claude Code's `.mcp.json` for the open solution |
 
 ## Requirements
 
@@ -141,6 +188,7 @@ Everything lives under **Tools → D365 Developer Tools**:
 - A Dataverse / Dynamics 365 environment
 - For client credentials auth: an Azure AD app registration with a client secret and appropriate
   Dataverse permissions
+- .NET 8 runtime (required for the bundled MCP server)
 
 ## Known Limitations
 
@@ -148,7 +196,7 @@ This is a from-scratch C# port of a companion VS Code extension, focused on the 
 code-generation workflow. Not yet included:
 
 - Web resource publish/compare
-- The MCP server / Claude integration
 - The `// @d365 <entity>` comment + lightbulb generation trigger (only the "type `d365`" completion
   path is implemented)
-- If no solution is open, connections are session-only and aren't remembered between restarts
+- If no solution is open, connections are session-only and aren't remembered between restarts, and the
+  MCP server can't be configured (there's nowhere to write `.mcp.json`)

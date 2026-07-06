@@ -9,4 +9,5 @@
     <Platform Solution="*|x86" Project="x86" />
     <Deploy Solution="Debug|Any CPU" />
   </Project>
+  <Project Path="D365 Developer Tools (Unofficial) for Visual Studio.McpServer/D365 Developer Tools (Unofficial) for Visual Studio.McpServer.csproj" />
 </Solution>

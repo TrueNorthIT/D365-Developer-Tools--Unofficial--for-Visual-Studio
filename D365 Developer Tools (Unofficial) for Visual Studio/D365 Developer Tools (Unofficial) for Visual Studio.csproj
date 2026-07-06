@@ -52,4 +52,29 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
+  <!-- The MCP server is a standalone .NET 8 console app (it hosts the MCP C# SDK, which targets a
+       modern runtime incompatible with this project's net472/VS-SDK requirement) that ships bundled
+       inside this extension's VSIX so "D365: Configure MCP Server for this Solution" can point Claude
+       Code at it without the user installing anything separately. Publishing it here, rather than via
+       a normal ProjectReference, is what lets its output land in the VSIX: content produced by a
+       ProjectReference's own build isn't visible to VSSDK's Content-item globbing, but files added to
+       @(Content) from inside a target - as done here - are. -->
+  <PropertyGroup>
+    <_McpServerProject>$(MSBuildThisFileDirectory)..\D365 Developer Tools (Unofficial) for Visual Studio.McpServer\D365 Developer Tools (Unofficial) for Visual Studio.McpServer.csproj</_McpServerProject>
+    <_McpServerPublishDir>$(MSBuildThisFileDirectory)$(BaseIntermediateOutputPath)McpServerPublish\</_McpServerPublishDir>
+  </PropertyGroup>
+
+  <Target Name="PublishMcpServer" BeforeTargets="GetVsixSourceItems" Condition="Exists('$(_McpServerProject)')">
+    <MSBuild Projects="$(_McpServerProject)" Targets="Restore;Publish"
+             Properties="Configuration=$(Configuration);PublishDir=$(_McpServerPublishDir);SelfContained=false" />
+    <ItemGroup>
+      <_McpServerFile Include="$(_McpServerPublishDir)**\*.*" />
+      <Content Include="@(_McpServerFile)">
+        <Link>McpServer\%(RecursiveDir)%(Filename)%(Extension)</Link>
+        <IncludeInVSIX>true</IncludeInVSIX>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+  </Target>
+
 </Project>
