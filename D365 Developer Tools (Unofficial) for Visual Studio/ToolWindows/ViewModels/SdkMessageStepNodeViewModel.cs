@@ -52,6 +52,11 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         {
             Step = step;
             _client = client;
+
+            // A placeholder child so the TreeViewItem shows its expand chevron before the real
+            // images are lazy-loaded (WPF hides the chevron whenever HasItems is false).
+            // LoadImagesAsync replaces this the moment the node is actually expanded.
+            Images.Add(null);
         }
 
         private async Task LoadImagesAsync()

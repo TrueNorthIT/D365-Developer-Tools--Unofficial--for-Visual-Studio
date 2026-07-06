@@ -49,6 +49,11 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         {
             Assembly = assembly;
             _client = client;
+
+            // A placeholder child so the TreeViewItem shows its expand chevron before the real
+            // plugin types are lazy-loaded (WPF hides the chevron whenever HasItems is false).
+            // LoadTypesAsync replaces this the moment the node is actually expanded.
+            Types.Add(null);
         }
 
         private async Task LoadTypesAsync()

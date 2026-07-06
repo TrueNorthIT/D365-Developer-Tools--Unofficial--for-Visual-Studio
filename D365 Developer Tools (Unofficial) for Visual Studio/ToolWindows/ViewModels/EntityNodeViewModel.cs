@@ -42,6 +42,11 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         {
             Entity = entity;
             _client = client;
+
+            // A placeholder child so the TreeViewItem shows its expand chevron before the real
+            // attributes are lazy-loaded (WPF hides the chevron whenever HasItems is false).
+            // LoadAttributesAsync replaces this the moment the node is actually expanded.
+            Attributes.Add(null);
         }
 
         private async Task LoadAttributesAsync()
