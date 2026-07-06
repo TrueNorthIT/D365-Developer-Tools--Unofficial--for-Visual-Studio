@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -77,6 +78,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
 
                     if (config["mcpServers"]?[ServerKey] != null)
                     {
+                        EnsureGitIgnored(solutionDir);
                         ShowMessage("MCP server is already configured for this solution.", MessageBoxImage.Information);
                         return;
                     }
@@ -91,6 +93,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
                 servers[ServerKey] = new JObject { ["command"] = serverExePath };
 
                 File.WriteAllText(mcpJsonPath, config.ToString(Formatting.Indented) + Environment.NewLine);
+                EnsureGitIgnored(solutionDir);
 
                 ShowMessage(
                     "Configured .mcp.json for this solution — restart Claude Code to enable Dataverse schema queries.",
@@ -105,5 +108,44 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
 
         private static void ShowMessage(string message, MessageBoxImage icon) =>
             DialogForegroundHelper.ShowMessage(message, "D365 Developer Tools", MessageBoxButton.OK, icon);
+
+        /// <summary>
+        /// .mcp.json can embed a machine-specific path to the bundled MCP server, so if the solution
+        /// lives in a git repo that already has a .gitignore, keep it out of source control. Does
+        /// nothing if no .gitignore exists anywhere between the solution and the repo root — this
+        /// only extends an existing ignore file, it never creates one.
+        /// </summary>
+        private static void EnsureGitIgnored(string solutionDir)
+        {
+            var gitignorePath = FindNearestGitignoreInRepo(solutionDir);
+            if (gitignorePath == null) { return; }
+
+            var content = File.ReadAllText(gitignorePath);
+            var alreadyIgnored = content
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Any(line => line.Trim() == ".mcp.json");
+            if (alreadyIgnored) { return; }
+
+            var separator = content.Length > 0 && !content.EndsWith("\n") ? Environment.NewLine : string.Empty;
+            File.AppendAllText(gitignorePath, separator + ".mcp.json" + Environment.NewLine);
+        }
+
+        private static string FindNearestGitignoreInRepo(string startDir)
+        {
+            var dir = startDir;
+            while (!string.IsNullOrEmpty(dir))
+            {
+                var candidate = Path.Combine(dir, ".gitignore");
+                if (File.Exists(candidate)) { return candidate; }
+
+                if (Directory.Exists(Path.Combine(dir, ".git"))) { return null; } // reached the repo root without finding one
+
+                var parent = Directory.GetParent(dir);
+                if (parent == null) { return null; }
+                dir = parent.FullName;
+            }
+
+            return null;
+        }
     }
 }
