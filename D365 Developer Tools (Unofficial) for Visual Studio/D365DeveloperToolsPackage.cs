@@ -137,6 +137,13 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
             }
         }
 
+        /// <summary>Public wrapper around the protected Package.GetService, for ViewModels that need EnvDTE (e.g. Plugin Explorer's "Publish project..." button).</summary>
+        internal EnvDTE.DTE GetDte()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            return GetService(typeof(EnvDTE.DTE)) as EnvDTE.DTE;
+        }
+
         /// <summary>Public wrapper around the protected AsyncPackage.ShowToolWindowAsync, for the Extensibility-model commands.</summary>
         internal async Task ShowEntityExplorerToolWindowAsync()
         {

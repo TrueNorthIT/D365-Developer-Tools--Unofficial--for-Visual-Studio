@@ -46,8 +46,13 @@ plugin assemblies, similar to the Plugin Registration Tool.
 - Expand a plugin type to see its registered steps — message, target entity, stage, and execution mode,
   with disabled steps shown dimmed
 - Expand a step to see its registered pre-/post-images
-
-Browsing here is read-only — for deploying a plugin project's own output, see [Publish to Dataverse](#publish-to-dataverse) below.
+- **Publish project to Dataverse...** — the toolbar button next to the search box builds a project from
+  the open solution and publishes it, the same as right-clicking it in Solution Explorer (see
+  [Publish to Dataverse](#publish-to-dataverse)); the tree refreshes afterward
+- Right-click a plugin type → **Add Step...** to register a new step for it (see [Add Step](#add-step))
+- Right-click a step → **Edit Step...** to change its message, target entity, stage, execution mode,
+  execution order, filtering attributes, or solution — the same dialog as Add Step, pre-filled with the
+  step's current values
 
 ### Publish to Dataverse
 

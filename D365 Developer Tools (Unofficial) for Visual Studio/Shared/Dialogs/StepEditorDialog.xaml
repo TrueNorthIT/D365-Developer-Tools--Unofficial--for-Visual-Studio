@@ -5,7 +5,7 @@
         xmlns:controls="clr-namespace:D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Controls"
         xmlns:vsp="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
         x:ClassModifier="internal"
-        Title="D365: Add Step" Height="440" Width="480"
+        Title="{Binding DialogTitle}" Height="440" Width="480"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
@@ -76,7 +76,7 @@
                   ItemsSource="{Binding Solutions}" DisplayMemberPath="FriendlyName" SelectedItem="{Binding SelectedSolution}" />
 
         <StackPanel Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-            <Button Content="OK" Width="80" IsDefault="True" Click="OnOk" Margin="0,0,8,0" />
+            <Button Content="{Binding OkButtonLabel}" Width="80" IsDefault="True" Click="OnOk" Margin="0,0,8,0" />
             <Button Content="Cancel" Width="80" IsCancel="True" />
         </StackPanel>
     </Grid>

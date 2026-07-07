@@ -28,12 +28,16 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
     {
         public string StepId { get; set; }
         public string Name { get; set; }
+        public string SdkMessageId { get; set; }
         public string MessageName { get; set; }
 
         /// <summary>Null for steps registered against every entity (no message filter).</summary>
+        public string SdkMessageFilterId { get; set; }
         public string PrimaryEntity { get; set; }
 
+        public int StageValue { get; set; }
         public string Stage { get; set; }
+        public int ModeValue { get; set; }
         public string Mode { get; set; }
         public int Rank { get; set; }
         public bool IsEnabled { get; set; }

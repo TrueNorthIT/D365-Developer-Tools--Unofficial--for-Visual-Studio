@@ -66,7 +66,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             {
                 var types = await _client.GetPluginTypesAsync(Assembly.PluginAssemblyId).ConfigureAwait(true);
                 Types.Clear();
-                foreach (var type in types) { Types.Add(new PluginTypeNodeViewModel(type, _client)); }
+                foreach (var type in types) { Types.Add(new PluginTypeNodeViewModel(type, _client, Assembly.PluginAssemblyId)); }
             }
             catch (Exception ex)
             {

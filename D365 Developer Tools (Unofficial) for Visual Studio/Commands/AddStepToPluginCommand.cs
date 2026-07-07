@@ -99,27 +99,37 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
                 match = pick.Value;
             }
 
-            var viewModel = new StepEditorViewModel(client, prompts, match.FriendlyName);
+            await RunAddStepDialogAsync(client, prompts, match.PluginTypeId, match.PluginAssemblyId, match.FriendlyName).ConfigureAwait(true);
+        }
+
+        /// <summary>
+        /// Shared with the Plugin Explorer's "Add Step..." context menu command, which already knows the
+        /// plugin type/assembly directly and doesn't need the file-scanning/type-lookup steps above.
+        /// Returns true if a step was actually registered.
+        /// </summary>
+        public static async Task<bool> RunAddStepDialogAsync(DataverseClient client, IUserPrompts prompts, string pluginTypeId, string pluginAssemblyId, string pluginTypeFriendlyName)
+        {
+            var viewModel = new StepEditorViewModel(client, prompts, pluginTypeFriendlyName);
             try
             {
-                await prompts.RunWithProgressAsync("D365: Loading step options…", () => viewModel.LoadAsync(match.PluginAssemblyId)).ConfigureAwait(true);
+                await prompts.RunWithProgressAsync("D365: Loading step options…", () => viewModel.LoadAsync(pluginAssemblyId)).ConfigureAwait(true);
             }
             catch (Exception ex)
             {
                 prompts.ShowError($"D365: Failed to load step options: {ex.Message}");
-                return;
+                return false;
             }
 
             var ownerHwnd = await VsShellHelper.GetMainWindowHandleAsync().ConfigureAwait(true);
             var dialog = new StepEditorDialog(viewModel);
             if (ownerHwnd != IntPtr.Zero) { new WindowInteropHelper(dialog).Owner = ownerHwnd; }
 
-            if (dialog.ShowDialog() != true) { return; }
+            if (dialog.ShowDialog() != true) { return false; }
 
             try
             {
                 await prompts.RunWithProgressAsync("D365: Registering step…", () => client.CreateSdkMessageStepAsync(
-                    match.PluginTypeId,
+                    pluginTypeId,
                     viewModel.SelectedMessage.SdkMessageId,
                     viewModel.SelectedEntity?.SdkMessageFilterId,
                     viewModel.StepName,
@@ -132,10 +142,11 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
             catch (Exception ex)
             {
                 prompts.ShowError($"D365: Failed to register the step: {ex.Message}");
-                return;
+                return false;
             }
 
             prompts.ShowInfo($"D365: Registered step '{viewModel.StepName}'.");
+            return true;
         }
     }
 }

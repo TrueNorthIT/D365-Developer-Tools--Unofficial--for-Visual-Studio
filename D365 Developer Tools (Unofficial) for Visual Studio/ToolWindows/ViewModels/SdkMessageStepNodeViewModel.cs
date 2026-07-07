@@ -12,8 +12,12 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
     {
         private readonly DataverseClient _client;
         private bool _imagesLoaded;
+        private SdkMessageStepDefinition _step;
 
-        public SdkMessageStepDefinition Step { get; }
+        public SdkMessageStepDefinition Step => _step;
+
+        /// <summary>The owning plugin type's friendly name, for the "Edit Step..." dialog header.</summary>
+        public string PluginTypeFriendlyName { get; }
 
         public string Name => Step.Name;
         public string MessageName => Step.MessageName;
@@ -48,15 +52,34 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         private string _error;
         public string Error { get => _error; private set => SetProperty(ref _error, value); }
 
-        public SdkMessageStepNodeViewModel(SdkMessageStepDefinition step, DataverseClient client)
+        public SdkMessageStepNodeViewModel(SdkMessageStepDefinition step, DataverseClient client, string pluginTypeFriendlyName)
         {
-            Step = step;
+            _step = step;
             _client = client;
+            PluginTypeFriendlyName = pluginTypeFriendlyName;
 
             // A placeholder child so the TreeViewItem shows its expand chevron before the real
             // images are lazy-loaded (WPF hides the chevron whenever HasItems is false).
             // LoadImagesAsync replaces this the moment the node is actually expanded.
             Images.Add(null);
+        }
+
+        /// <summary>Re-fetches this step's own fields after an edit, without disturbing sibling steps or its loaded images.</summary>
+        public async Task ReloadAsync()
+        {
+            var updated = await _client.GetSdkMessageStepAsync(Step.StepId).ConfigureAwait(true);
+            if (updated == null) { return; }
+
+            _step = updated;
+            OnPropertyChanged(nameof(Name));
+            OnPropertyChanged(nameof(MessageName));
+            OnPropertyChanged(nameof(PrimaryEntity));
+            OnPropertyChanged(nameof(Stage));
+            OnPropertyChanged(nameof(Mode));
+            OnPropertyChanged(nameof(Rank));
+            OnPropertyChanged(nameof(IsEnabled));
+            OnPropertyChanged(nameof(FilteringAttributes));
+            OnPropertyChanged(nameof(Summary));
         }
 
         private async Task LoadImagesAsync()

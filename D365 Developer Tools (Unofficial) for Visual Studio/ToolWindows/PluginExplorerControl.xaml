@@ -21,6 +21,13 @@
         <conv:BoolToAssemblyIconConverter x:Key="BoolToAssemblyIconConverter" />
         <dlg:EmptyToCollapsedConverter x:Key="EmptyToCollapsedConverter" />
 
+        <ContextMenu x:Key="TypeContextMenu">
+            <MenuItem Header="Add Step..." Click="OnAddStepClick" />
+        </ContextMenu>
+        <ContextMenu x:Key="StepContextMenu">
+            <MenuItem Header="Edit Step..." Click="OnEditStepClick" />
+        </ContextMenu>
+
         <DataTemplate x:Key="ImageTemplate">
             <Grid Margin="0,1">
                 <Grid.ColumnDefinitions>
@@ -39,7 +46,7 @@
         </DataTemplate>
 
         <HierarchicalDataTemplate x:Key="StepTemplate" ItemsSource="{Binding Images}" ItemTemplate="{StaticResource ImageTemplate}">
-            <Grid Margin="0,1" Opacity="{Binding IsEnabled, Converter={StaticResource BoolToOpacityConverter}}">
+            <Grid Margin="0,1" Opacity="{Binding IsEnabled, Converter={StaticResource BoolToOpacityConverter}}" ContextMenu="{StaticResource StepContextMenu}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -53,7 +60,7 @@
         </HierarchicalDataTemplate>
 
         <HierarchicalDataTemplate x:Key="TypeTemplate" ItemsSource="{Binding Steps}" ItemTemplate="{StaticResource StepTemplate}">
-            <Grid Margin="0,2">
+            <Grid Margin="0,2" ContextMenu="{StaticResource TypeContextMenu}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -119,6 +126,7 @@
                         Command="{Binding ClearSolutionFilterCommand}"
                         Visibility="{Binding HasSolutionFilter, Converter={StaticResource BoolToVisibleConverter}}" />
             </Grid>
+            <Button Content="Publish project to Dataverse..." Command="{Binding PublishProjectCommand}" Margin="0,4,0,0" Padding="4,3" />
         </StackPanel>
 
         <!-- Body -->

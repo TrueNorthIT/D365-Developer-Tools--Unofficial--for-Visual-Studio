@@ -60,6 +60,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         public ICommand ShowMenuCommand { get; }
         public ICommand ShowSolutionPickerCommand { get; }
         public ICommand ClearSolutionFilterCommand { get; }
+        public ICommand PublishProjectCommand { get; }
 
         public PluginExplorerViewModel(ConnectionManager connectionManager, DataverseClient client, IUserPrompts prompts)
         {
@@ -75,6 +76,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             ShowMenuCommand = new AsyncRelayCommand(() => ConnectionMenu.ShowAsync(_connectionManager, _prompts));
             ShowSolutionPickerCommand = new AsyncRelayCommand(ShowSolutionPickerAsync);
             ClearSolutionFilterCommand = new RelayCommand(_ => ClearSolutionFilter());
+            PublishProjectCommand = new AsyncRelayCommand(PublishProjectAsync);
 
             // See EntityExplorerViewModel's constructor for why this hops to the UI thread first.
             _connectionManager.ConnectionChanged += (_, __) =>
@@ -182,6 +184,59 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             SolutionFilterName = null;
             OnPropertyChanged(nameof(HasSolutionFilter));
             AssembliesView.Refresh();
+        }
+
+        /// <summary>Builds a project from the open solution and publishes it, same as the Solution Explorer project context menu command.</summary>
+        private async Task PublishProjectAsync()
+        {
+            var package = await D365DeveloperToolsPackage.GetReadyInstanceAsync().ConfigureAwait(true);
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            var dte = package.GetDte();
+            if (dte?.Solution == null || !dte.Solution.IsOpen)
+            {
+                _prompts.ShowError("D365: Open a solution with a plugin project first.");
+                return;
+            }
+
+            var projects = VsShellHelper.GetAllProjects(dte);
+            if (projects.Count == 0)
+            {
+                _prompts.ShowError("D365: No projects found in the open solution.");
+                return;
+            }
+
+            EnvDTE.Project project;
+            if (projects.Count == 1)
+            {
+                project = projects[0];
+            }
+            else
+            {
+                var items = projects.Select(p => new PickItem<EnvDTE.Project>(p.Name, null, p)).ToList();
+                var pick = await _prompts.PickOneAsync("D365: Choose a project", "Select the project to publish…", items).ConfigureAwait(true);
+                if (pick == null) { return; }
+                project = pick.Value;
+            }
+
+            await PublishToDataverseCommand.ExecuteAsync(dte, project).ConfigureAwait(true);
+            await RefreshAsync().ConfigureAwait(true);
+        }
+
+        /// <summary>Registers a new step on a plugin type found in this tree, reusing the same dialog as the .cs file "Add Step..." command.</summary>
+        public async Task AddStepAsync(PluginTypeNodeViewModel node)
+        {
+            var succeeded = await AddStepToPluginCommand.RunAddStepDialogAsync(
+                _client, _prompts, node.PluginType.PluginTypeId, node.PluginAssemblyId, node.FriendlyName).ConfigureAwait(true);
+
+            if (succeeded) { await node.ReloadStepsAsync().ConfigureAwait(true); }
+        }
+
+        /// <summary>Edits an already-registered step found in this tree.</summary>
+        public async Task EditStepAsync(SdkMessageStepNodeViewModel node)
+        {
+            var succeeded = await EditStepCommand.ExecuteAsync(_client, _prompts, node.Step, node.PluginTypeFriendlyName).ConfigureAwait(true);
+            if (succeeded) { await node.ReloadAsync().ConfigureAwait(true); }
         }
     }
 }

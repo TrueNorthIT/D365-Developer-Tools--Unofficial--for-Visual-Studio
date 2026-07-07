@@ -21,6 +21,9 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs
         private string _filteringAttributes;
 
         public string PluginTypeFriendlyName { get; }
+        public bool IsEditMode { get; }
+        public string DialogTitle => IsEditMode ? "D365: Edit Step" : "D365: Add Step";
+        public string OkButtonLabel => IsEditMode ? "Update" : "Register";
 
         public ObservableCollection<SdkMessageOption> Messages { get; } = new ObservableCollection<SdkMessageOption>();
         public ObservableCollection<SdkMessageFilterOption> Entities { get; } = new ObservableCollection<SdkMessageFilterOption>();
@@ -82,11 +85,12 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs
 
         public ICommand ChooseFilteringAttributesCommand { get; }
 
-        public StepEditorViewModel(DataverseClient client, IUserPrompts prompts, string pluginTypeFriendlyName)
+        public StepEditorViewModel(DataverseClient client, IUserPrompts prompts, string pluginTypeFriendlyName, bool isEditMode = false)
         {
             _client = client;
             _prompts = prompts;
             PluginTypeFriendlyName = pluginTypeFriendlyName;
+            IsEditMode = isEditMode;
             ChooseFilteringAttributesCommand = new AsyncRelayCommand(ChooseFilteringAttributesAsync);
         }
 
@@ -114,6 +118,54 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs
 
             SelectedStage = Stages.FirstOrDefault(s => s.Value == 40) ?? Stages.FirstOrDefault();
             SelectedMode = Modes.FirstOrDefault(m => m.Value == 0);
+        }
+
+        /// <summary>
+        /// Populates the dialog with an existing step's current values for editing. Doesn't go through
+        /// the SelectedMessage/SelectedEntity setters — those recompute the default step name and reset
+        /// filtering attributes as a side effect of the user picking a *new* message, which would stomp
+        /// the existing step's own name/attributes before the user has changed anything.
+        /// </summary>
+        public async Task LoadForEditAsync(SdkMessageStepDefinition existingStep)
+        {
+            var messages = await _client.GetSdkMessagesAsync().ConfigureAwait(true);
+            Messages.Clear();
+            foreach (var m in messages) { Messages.Add(m); }
+
+            var solutions = await _client.GetSolutionsAsync().ConfigureAwait(true);
+            Solutions.Clear();
+            Solutions.Add(NoSolutionOption);
+            foreach (var s in solutions) { Solutions.Add(s); }
+
+            var containingSolutions = await _client.GetSolutionsContainingStepAsync(existingStep.StepId).ConfigureAwait(true);
+
+            var message = Messages.FirstOrDefault(m => m.SdkMessageId == existingStep.SdkMessageId) ?? Messages.FirstOrDefault();
+            _selectedMessage = message;
+            OnPropertyChanged(nameof(SelectedMessage));
+            OnPropertyChanged(nameof(IsUpdateMessage));
+
+            Entities.Clear();
+            Entities.Add(AllEntitiesOption);
+            if (message != null)
+            {
+                var filters = await _client.GetSdkMessageFiltersAsync(message.SdkMessageId).ConfigureAwait(true);
+                foreach (var f in filters) { Entities.Add(f); }
+            }
+
+            _selectedEntity = Entities.FirstOrDefault(e => e != AllEntitiesOption && e.SdkMessageFilterId == existingStep.SdkMessageFilterId) ?? AllEntitiesOption;
+            OnPropertyChanged(nameof(SelectedEntity));
+
+            _filteringAttributes = existingStep.FilteringAttributes;
+            OnPropertyChanged(nameof(FilteringAttributesSummary));
+
+            StepName = existingStep.Name;
+            SelectedStage = Stages.FirstOrDefault(s => s.Value == existingStep.StageValue) ?? Stages.FirstOrDefault();
+            SelectedMode = Modes.FirstOrDefault(m => m.Value == existingStep.ModeValue) ?? Modes.FirstOrDefault();
+            Rank = existingStep.Rank.ToString();
+
+            SelectedSolution = containingSolutions.Count == 1
+                ? Solutions.FirstOrDefault(s => s.SolutionId == containingSolutions[0].SolutionId) ?? NoSolutionOption
+                : NoSolutionOption;
         }
 
         private async Task LoadEntitiesForMessageAsync()

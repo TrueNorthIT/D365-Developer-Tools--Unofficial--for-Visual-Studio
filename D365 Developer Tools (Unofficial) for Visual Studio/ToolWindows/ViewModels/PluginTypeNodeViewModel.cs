@@ -15,6 +15,9 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
 
         public PluginTypeDefinition PluginType { get; }
 
+        /// <summary>The owning assembly's ID — needed to default the "Add Step" dialog's solution picker.</summary>
+        public string PluginAssemblyId { get; }
+
         public string Name => PluginType.TypeName;
         public string FriendlyName => PluginType.FriendlyName;
         public bool IsWorkflowActivity => PluginType.IsWorkflowActivity;
@@ -40,15 +43,23 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         private string _error;
         public string Error { get => _error; private set => SetProperty(ref _error, value); }
 
-        public PluginTypeNodeViewModel(PluginTypeDefinition pluginType, DataverseClient client)
+        public PluginTypeNodeViewModel(PluginTypeDefinition pluginType, DataverseClient client, string pluginAssemblyId)
         {
             PluginType = pluginType;
+            PluginAssemblyId = pluginAssemblyId;
             _client = client;
 
             // A placeholder child so the TreeViewItem shows its expand chevron before the real
             // steps are lazy-loaded (WPF hides the chevron whenever HasItems is false).
             // LoadStepsAsync replaces this the moment the node is actually expanded.
             Steps.Add(null);
+        }
+
+        /// <summary>Forces a reload of this type's steps, e.g. after a new one is registered via "Add Step...".</summary>
+        public Task ReloadStepsAsync()
+        {
+            _stepsLoaded = false;
+            return LoadStepsAsync();
         }
 
         private async Task LoadStepsAsync()
@@ -61,7 +72,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             {
                 var steps = await _client.GetSdkMessageStepsAsync(PluginType.PluginTypeId).ConfigureAwait(true);
                 Steps.Clear();
-                foreach (var step in steps) { Steps.Add(new SdkMessageStepNodeViewModel(step, _client)); }
+                foreach (var step in steps) { Steps.Add(new SdkMessageStepNodeViewModel(step, _client, FriendlyName)); }
             }
             catch (Exception ex)
             {

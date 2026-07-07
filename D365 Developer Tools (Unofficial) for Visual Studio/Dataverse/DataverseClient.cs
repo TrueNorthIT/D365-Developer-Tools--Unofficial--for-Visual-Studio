@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -187,14 +188,25 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                 .ToList();
         }
 
-        public async Task<List<SdkMessageStepDefinition>> GetSdkMessageStepsAsync(string pluginTypeId)
-        {
-            var url = ApiUrl(
-                "sdkmessageprocessingsteps",
-                "$select=sdkmessageprocessingstepid,name,stage,mode,rank,statecode,filteringattributes,_sdkmessageid_value,_sdkmessagefilterid_value",
-                $"$filter=_plugintypeid_value eq '{pluginTypeId}'",
-                "$orderby=stage,rank");
+        public Task<List<SdkMessageStepDefinition>> GetSdkMessageStepsAsync(string pluginTypeId) =>
+            GetSdkMessageStepsByFilterAsync($"_plugintypeid_value eq '{pluginTypeId}'", "$orderby=stage,rank");
 
+        public async Task<SdkMessageStepDefinition> GetSdkMessageStepAsync(string stepId)
+        {
+            var steps = await GetSdkMessageStepsByFilterAsync($"sdkmessageprocessingstepid eq '{stepId}'").ConfigureAwait(false);
+            return steps.FirstOrDefault();
+        }
+
+        private async Task<List<SdkMessageStepDefinition>> GetSdkMessageStepsByFilterAsync(string filter, string orderBy = null)
+        {
+            var queryParts = new List<string>
+            {
+                "$select=sdkmessageprocessingstepid,name,stage,mode,rank,statecode,filteringattributes,_sdkmessageid_value,_sdkmessagefilterid_value",
+                $"$filter={filter}",
+            };
+            if (orderBy != null) { queryParts.Add(orderBy); }
+
+            var url = ApiUrl("sdkmessageprocessingsteps", queryParts.ToArray());
             var raw = await FetchPagedAsync<SdkMessageStepDto>(url).ConfigureAwait(false);
 
             var messageIds = raw.Where(s => s.SdkMessageIdValue != null).Select(s => s.SdkMessageIdValue).Distinct().ToList();
@@ -212,9 +224,13 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                 {
                     StepId = s.SdkMessageProcessingStepId,
                     Name = s.Name,
+                    SdkMessageId = s.SdkMessageIdValue,
                     MessageName = s.SdkMessageIdValue != null && messageNames.TryGetValue(s.SdkMessageIdValue, out var messageName) ? messageName : null,
+                    SdkMessageFilterId = s.SdkMessageFilterIdValue,
                     PrimaryEntity = s.SdkMessageFilterIdValue != null && filterEntities.TryGetValue(s.SdkMessageFilterIdValue, out var entity) ? entity : null,
+                    StageValue = s.Stage,
                     Stage = PluginOptionLabels.Stage(s.Stage),
+                    ModeValue = s.Mode,
                     Mode = PluginOptionLabels.Mode(s.Mode),
                     Rank = s.Rank,
                     IsEnabled = s.StateCode == 0,
@@ -351,12 +367,19 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         }
 
         /// <summary>Returns the solutions (from the same set GetSolutionsAsync returns) that contain the given plugin assembly.</summary>
-        public async Task<List<DataverseSolution>> GetSolutionsContainingPluginAssemblyAsync(string pluginAssemblyId)
+        public Task<List<DataverseSolution>> GetSolutionsContainingPluginAssemblyAsync(string pluginAssemblyId) =>
+            GetSolutionsContainingComponentAsync(pluginAssemblyId, componentType: 91); // Plugin Assembly
+
+        /// <summary>Returns the solutions (from the same set GetSolutionsAsync returns) that contain the given SDK message processing step.</summary>
+        public Task<List<DataverseSolution>> GetSolutionsContainingStepAsync(string stepId) =>
+            GetSolutionsContainingComponentAsync(stepId, componentType: 92); // SDK Message Processing Step
+
+        private async Task<List<DataverseSolution>> GetSolutionsContainingComponentAsync(string objectId, int componentType)
         {
             var url = ApiUrl(
                 "solutioncomponents",
                 "$select=_solutionid_value",
-                $"$filter=objectid eq '{pluginAssemblyId}' and componenttype eq 91");
+                $"$filter=objectid eq '{objectId}' and componenttype eq {componentType}");
 
             var raw = await FetchPagedAsync<SolutionComponentSolutionDto>(url).ConfigureAwait(false);
             var solutionIds = new HashSet<string>(raw.Select(c => c.SolutionIdValue));
@@ -423,6 +446,52 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
             return CreateRecordAsync("sdkmessageprocessingsteps", body, solutionUniqueName);
         }
 
+        /// <summary>
+        /// Updates an existing SDK message processing step. Message/entity/stage/mode/rank/filtering
+        /// attributes are all editable, matching the Plugin Registration Tool's own "Update Step" dialog.
+        /// Clearing the entity filter (switching back to "all entities") needs a separate $ref delete —
+        /// Web API PATCH can't null out a single-valued navigation property by binding it to nothing.
+        /// </summary>
+        public async Task UpdateSdkMessageStepAsync(
+            string stepId,
+            string sdkMessageId,
+            string sdkMessageFilterId,
+            string name,
+            int stage,
+            int mode,
+            int rank,
+            string filteringAttributes,
+            string solutionUniqueName)
+        {
+            var body = new Dictionary<string, object>
+            {
+                ["name"] = name,
+                ["stage"] = stage,
+                ["mode"] = mode,
+                ["rank"] = rank,
+                ["filteringattributes"] = filteringAttributes,
+                ["sdkmessageid@odata.bind"] = $"/sdkmessages({sdkMessageId})",
+            };
+
+            if (!string.IsNullOrEmpty(sdkMessageFilterId))
+            {
+                body["sdkmessagefilterid@odata.bind"] = $"/sdkmessagefilters({sdkMessageFilterId})";
+            }
+
+            await UpdateRecordAsync("sdkmessageprocessingsteps", stepId, body, solutionUniqueName).ConfigureAwait(false);
+
+            if (string.IsNullOrEmpty(sdkMessageFilterId))
+            {
+                await ClearSdkMessageStepFilterAsync(stepId).ConfigureAwait(false);
+            }
+        }
+
+        private async Task ClearSdkMessageStepFilterAsync(string stepId)
+        {
+            var url = $"{RecordUrl("sdkmessageprocessingsteps", stepId)}/sdkmessagefilterid/$ref";
+            using (await SendAsync(url, HttpMethod.Delete, null, null, HttpStatusCode.NotFound).ConfigureAwait(false)) { }
+        }
+
         // ── Internals ────────────────────────────────────────────────────────
 
         private string ApiUrl(string resource, params string[] queryParts)
@@ -431,6 +500,8 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
             var query = queryParts.Length > 0 ? "?" + string.Join("&", queryParts) : string.Empty;
             return $"{baseUrl}/api/data/v9.2/{resource}{query}";
         }
+
+        private string RecordUrl(string entitySetName, string id) => $"{ApiUrl(entitySetName)}({id})";
 
         private async Task<List<T>> FetchPagedAsync<T>(string initialUrl)
         {
@@ -480,15 +551,19 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
             }
         }
 
-        private async Task UpdateRecordAsync(string entitySetName, string id, object body)
+        private async Task UpdateRecordAsync(string entitySetName, string id, object body, string solutionUniqueName = null)
         {
-            using (await SendAsync($"{ApiUrl(entitySetName)}({id})", new HttpMethod("PATCH"), body, null).ConfigureAwait(false))
+            var headers = string.IsNullOrEmpty(solutionUniqueName)
+                ? null
+                : new Dictionary<string, string> { ["MSCRM.SolutionUniqueName"] = solutionUniqueName };
+
+            using (await SendAsync(RecordUrl(entitySetName, id), new HttpMethod("PATCH"), body, headers).ConfigureAwait(false))
             {
                 // Dataverse returns 204 No Content on a successful update; nothing further to read.
             }
         }
 
-        private async Task<HttpResponseMessage> SendAsync(string url, HttpMethod method, object body, IDictionary<string, string> extraHeaders)
+        private async Task<HttpResponseMessage> SendAsync(string url, HttpMethod method, object body, IDictionary<string, string> extraHeaders, HttpStatusCode? alsoAcceptable = null)
         {
             var token = await _connectionManager.GetAccessTokenAsync().ConfigureAwait(false);
 
@@ -509,7 +584,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
             }
 
             var response = await Http.SendAsync(request).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode && response.StatusCode != alsoAcceptable)
             {
                 var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 response.Dispose();
