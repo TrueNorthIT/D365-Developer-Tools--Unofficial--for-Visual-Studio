@@ -92,4 +92,26 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse.Dto
     {
         public string TypeName { get; set; }
     }
+
+    internal sealed class PluginAssemblyNameDto
+    {
+        public string PluginAssemblyId { get; set; }
+        public string Name { get; set; }
+    }
+
+    internal sealed class PluginTypeMatchDto
+    {
+        public string PluginTypeId { get; set; }
+        public string TypeName { get; set; }
+        public string FriendlyName { get; set; }
+
+        [JsonProperty("_pluginassemblyid_value")]
+        public string PluginAssemblyIdValue { get; set; }
+    }
+
+    internal sealed class SolutionComponentSolutionDto
+    {
+        [JsonProperty("_solutionid_value")]
+        public string SolutionIdValue { get; set; }
+    }
 }

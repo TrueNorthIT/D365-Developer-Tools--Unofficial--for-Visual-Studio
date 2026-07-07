@@ -12,6 +12,7 @@ VS Code extension, adapted for C#/early-bound Dataverse development instead of T
   - [Entity Explorer](#entity-explorer)
   - [Plugin Explorer](#plugin-explorer)
   - [Publish to Dataverse](#publish-to-dataverse)
+  - [Add Step](#add-step)
   - [C# Class Generation](#c-class-generation)
   - [Enum Generation](#enum-generation)
   - [IntelliSense Integration](#intellisense-integration)
@@ -68,6 +69,21 @@ deploy it without leaving Visual Studio.
 
      Your choice is remembered for that project, and you'll then be asked whether to add the new
      record to a solution (picked from a list of your Dataverse solutions).
+
+### Add Step
+
+Right-click a `.cs` file that contains a class implementing `IPlugin` and choose **D365: Add
+Step...** to register a new step for it without leaving Visual Studio.
+
+- Looks up the plugin type in the connected environment by its fully-qualified name — the project
+  needs to have been [published](#publish-to-dataverse) first, since a step can't be registered
+  against a type Dataverse doesn't know about yet. If the file has more than one `IPlugin` class, or
+  the type name matches more than one published assembly, you'll be asked which one to use.
+- Opens a dialog to set the message, target entity (only entities valid for the chosen message are
+  offered), stage, execution mode, execution order, and — for `Update` steps — the filtering
+  attributes.
+- **Solution** defaults to the one solution the plugin's assembly belongs to, if it's only in one;
+  otherwise you can pick one from the list, or leave it unset.
 
 ### C# Class Generation
 

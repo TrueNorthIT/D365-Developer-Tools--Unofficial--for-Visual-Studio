@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel.Design;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -118,6 +119,11 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
                 {
                     var publishCommandId = new CommandID(PackageGuids.ProjectContextMenuCmdSet, PkgCmdIDList.cmdidPublishToDataverse);
                     commandService.AddCommand(new OleMenuCommand(OnPublishToDataverse, publishCommandId));
+
+                    var addStepCommandId = new CommandID(PackageGuids.ProjectContextMenuCmdSet, PkgCmdIDList.cmdidAddStepToPlugin);
+                    var addStepCommand = new OleMenuCommand(OnAddStepToPlugin, addStepCommandId);
+                    addStepCommand.BeforeQueryStatus += OnAddStepToPluginBeforeQueryStatus;
+                    commandService.AddCommand(addStepCommand);
                 }
 
                 ActivityLog.LogInformation("D365DeveloperTools", "InitializeAsync: completed successfully");
@@ -166,6 +172,63 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
 
             Commands.PublishToDataverseCommand.ExecuteAsync(dte, project)
                 .FileAndForget("D365DeveloperTools/PublishToDataverse");
+        }
+
+        /// <summary>Only shows "D365: Add Step..." for a single selected .cs file whose text looks like it declares an IPlugin implementation.</summary>
+        private void OnAddStepToPluginBeforeQueryStatus(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            var command = (OleMenuCommand)sender;
+            command.Visible = false;
+            command.Enabled = false;
+
+            var filePath = TryGetSelectedCSharpFilePath();
+            if (filePath == null) { return; }
+
+            if (!PluginPublishing.PluginTypeNameExtractor.FileMightContainPlugin(filePath)) { return; }
+
+            command.Visible = true;
+            command.Enabled = true;
+        }
+
+        /// <summary>Handles the "D365: Add Step..." .cs file context menu command.</summary>
+        private void OnAddStepToPlugin(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            var filePath = TryGetSelectedCSharpFilePath();
+            if (filePath == null) { return; }
+
+            Commands.AddStepToPluginCommand.ExecuteAsync(filePath)
+                .FileAndForget("D365DeveloperTools/AddStepToPlugin");
+        }
+
+        private string TryGetSelectedCSharpFilePath()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            if (!(GetService(typeof(EnvDTE.DTE)) is EnvDTE.DTE dte)) { return null; }
+
+            var selectedItems = dte.SelectedItems;
+            if (selectedItems == null || selectedItems.Count != 1) { return null; }
+
+            var projectItem = selectedItems.Item(1).ProjectItem;
+            if (projectItem == null || projectItem.FileCount == 0) { return null; }
+
+            string filePath;
+            try
+            {
+                filePath = projectItem.FileNames[1];
+            }
+            catch
+            {
+                return null;
+            }
+
+            return !string.IsNullOrEmpty(filePath) && string.Equals(Path.GetExtension(filePath), ".cs", StringComparison.OrdinalIgnoreCase)
+                ? filePath
+                : null;
         }
 
         protected override void Dispose(bool disposing)

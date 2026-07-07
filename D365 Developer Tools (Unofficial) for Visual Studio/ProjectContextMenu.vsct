@@ -9,6 +9,9 @@
       <Group guid="guidD365ProjectContextMenuCmdSet" id="ProjectContextMenuGroup" priority="0x0600">
         <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_PROJNODE" />
       </Group>
+      <Group guid="guidD365ProjectContextMenuCmdSet" id="ItemContextMenuGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_ITEMNODE" />
+      </Group>
     </Groups>
 
     <Buttons>
@@ -16,6 +19,12 @@
         <Parent guid="guidD365ProjectContextMenuCmdSet" id="ProjectContextMenuGroup" />
         <Strings>
           <ButtonText>D365: Publish to Dataverse...</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidD365ProjectContextMenuCmdSet" id="cmdidAddStepToPlugin" priority="0x0100" type="Button">
+        <Parent guid="guidD365ProjectContextMenuCmdSet" id="ItemContextMenuGroup" />
+        <Strings>
+          <ButtonText>D365: Add Step...</ButtonText>
         </Strings>
       </Button>
     </Buttons>
@@ -27,6 +36,8 @@
     <GuidSymbol name="guidD365ProjectContextMenuCmdSet" value="{5f7a8b9c-1d2e-4f3a-b4c5-d6e7f8a9b0c1}">
       <IDSymbol name="ProjectContextMenuGroup" value="0x1020" />
       <IDSymbol name="cmdidPublishToDataverse" value="0x0100" />
+      <IDSymbol name="ItemContextMenuGroup" value="0x1021" />
+      <IDSymbol name="cmdidAddStepToPlugin" value="0x0101" />
     </GuidSymbol>
   </Symbols>
 </CommandTable>
