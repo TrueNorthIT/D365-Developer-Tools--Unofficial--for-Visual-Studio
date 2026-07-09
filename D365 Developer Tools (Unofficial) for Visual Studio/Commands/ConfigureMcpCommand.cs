@@ -29,10 +29,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
         {
         }
 
-        public override CommandConfiguration CommandConfiguration => new("D365: Configure MCP Server for this Solution")
-        {
-            Placements = new[] { CommandPlacement.KnownPlacements.ToolsMenu },
-        };
+        public override CommandConfiguration CommandConfiguration => new("Configure MCP Server for this Solution");
 
         public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
         {
