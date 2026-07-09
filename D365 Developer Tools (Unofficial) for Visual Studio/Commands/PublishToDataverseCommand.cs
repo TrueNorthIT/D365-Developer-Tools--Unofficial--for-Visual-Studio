@@ -150,12 +150,17 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
             }
         }
 
-        private static async Task<PluginDeploymentModel?> PromptForDeploymentModelAsync(IUserPrompts prompts)
+        /// <summary>Shared with <see cref="ChangeDeploymentModelCommand"/>, which lets the user revisit this choice before a project's first publish.</summary>
+        internal static async Task<PluginDeploymentModel?> PromptForDeploymentModelAsync(IUserPrompts prompts, PluginDeploymentModel? current = null)
         {
             var items = new List<PickItem<PluginDeploymentModel>>
             {
-                new PickItem<PluginDeploymentModel>("Traditional Plugin Assembly", "Uploads the built .dll to a Plugin Assembly record", PluginDeploymentModel.Assembly),
-                new PickItem<PluginDeploymentModel>("NuGet-style Plugin Package", "Uploads to a Plugin Package record", PluginDeploymentModel.Package),
+                new PickItem<PluginDeploymentModel>(
+                    "Traditional Plugin Assembly", "Uploads the built .dll to a Plugin Assembly record", PluginDeploymentModel.Assembly,
+                    detail: current == PluginDeploymentModel.Assembly ? "Current choice" : null),
+                new PickItem<PluginDeploymentModel>(
+                    "NuGet-style Plugin Package", "Uploads to a Plugin Package record", PluginDeploymentModel.Package,
+                    detail: current == PluginDeploymentModel.Package ? "Current choice" : null),
             };
 
             var pick = await prompts.PickOneAsync(

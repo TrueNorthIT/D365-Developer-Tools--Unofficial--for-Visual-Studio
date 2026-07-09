@@ -120,6 +120,9 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
                     var publishCommandId = new CommandID(PackageGuids.ProjectContextMenuCmdSet, PkgCmdIDList.cmdidPublishToDataverse);
                     commandService.AddCommand(new OleMenuCommand(OnPublishToDataverse, publishCommandId));
 
+                    var changeDeploymentModelCommandId = new CommandID(PackageGuids.ProjectContextMenuCmdSet, PkgCmdIDList.cmdidChangeDeploymentModel);
+                    commandService.AddCommand(new OleMenuCommand(OnChangeDeploymentModel, changeDeploymentModelCommandId));
+
                     var addStepCommandId = new CommandID(PackageGuids.ProjectContextMenuCmdSet, PkgCmdIDList.cmdidAddStepToPlugin);
                     var addStepCommand = new OleMenuCommand(OnAddStepToPlugin, addStepCommandId);
                     addStepCommand.BeforeQueryStatus += OnAddStepToPluginBeforeQueryStatus;
@@ -179,6 +182,23 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
 
             Commands.PublishToDataverseCommand.ExecuteAsync(dte, project)
                 .FileAndForget("D365DeveloperTools/PublishToDataverse");
+        }
+
+        /// <summary>Handles the "D365: Change Deployment Model..." Solution Explorer project context menu command.</summary>
+        private void OnChangeDeploymentModel(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            if (!(GetService(typeof(EnvDTE.DTE)) is EnvDTE.DTE dte)) { return; }
+
+            var selectedItems = dte.SelectedItems;
+            if (selectedItems == null || selectedItems.Count == 0) { return; }
+
+            var project = selectedItems.Item(1).Project;
+            if (project == null) { return; }
+
+            Commands.ChangeDeploymentModelCommand.ExecuteAsync(dte, project)
+                .FileAndForget("D365DeveloperTools/ChangeDeploymentModel");
         }
 
         /// <summary>Only shows "D365: Add Step..." for a single selected .cs file whose text looks like it declares an IPlugin implementation.</summary>

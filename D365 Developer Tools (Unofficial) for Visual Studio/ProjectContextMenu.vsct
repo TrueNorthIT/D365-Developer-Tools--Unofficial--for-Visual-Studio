@@ -21,6 +21,12 @@
           <ButtonText>D365: Publish to Dataverse...</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidD365ProjectContextMenuCmdSet" id="cmdidChangeDeploymentModel" priority="0x0101" type="Button">
+        <Parent guid="guidD365ProjectContextMenuCmdSet" id="ProjectContextMenuGroup" />
+        <Strings>
+          <ButtonText>D365: Change Deployment Model...</ButtonText>
+        </Strings>
+      </Button>
       <Button guid="guidD365ProjectContextMenuCmdSet" id="cmdidAddStepToPlugin" priority="0x0100" type="Button">
         <Parent guid="guidD365ProjectContextMenuCmdSet" id="ItemContextMenuGroup" />
         <Strings>
@@ -38,6 +44,7 @@
       <IDSymbol name="cmdidPublishToDataverse" value="0x0100" />
       <IDSymbol name="ItemContextMenuGroup" value="0x1021" />
       <IDSymbol name="cmdidAddStepToPlugin" value="0x0101" />
+      <IDSymbol name="cmdidChangeDeploymentModel" value="0x0102" />
     </GuidSymbol>
   </Symbols>
 </CommandTable>
