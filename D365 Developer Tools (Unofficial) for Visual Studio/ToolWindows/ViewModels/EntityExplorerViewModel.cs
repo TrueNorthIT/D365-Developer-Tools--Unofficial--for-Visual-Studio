@@ -246,7 +246,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
 
             var primaryId = attributes.FirstOrDefault(a => a.IsPrimaryId);
             var fileContent = EarlyBoundClassGenerator.GenerateFile(node.LogicalName, node.DisplayName, selectedAttrs, primaryId, enumNames, enumBlocks);
-            var className = NameUtilities.ToPascalCase(node.LogicalName);
+            var className = NameUtilities.ToPascalCase(node.LogicalName, node.DisplayName);
 
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
             DocumentOpener.OpenAsCSharp(fileContent, $"{className}.cs");
