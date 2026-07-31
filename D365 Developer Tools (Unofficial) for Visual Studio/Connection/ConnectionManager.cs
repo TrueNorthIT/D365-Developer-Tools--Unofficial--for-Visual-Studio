@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Auth;
+using D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Persistence;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared;
 using Newtonsoft.Json;
@@ -205,6 +206,27 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Connection
 
         public List<StoredConnection> GetRecentEnvironments() =>
             JsonFileStore.Load<List<StoredConnection>>(RecentsPath) ?? new List<StoredConnection>();
+
+        // ── Per-environment default solution (remembered across sessions, unlike the runtime-only
+        // solution filter that used to reset every time a tool window reconnected) ─────────────────
+
+        public DataverseSolution GetDefaultSolution(string environmentUrl) =>
+            string.IsNullOrEmpty(environmentUrl) ? null : JsonFileStore.Load<DataverseSolution>(DefaultSolutionPath(environmentUrl));
+
+        public void SetDefaultSolution(string environmentUrl, DataverseSolution solution)
+        {
+            if (string.IsNullOrEmpty(environmentUrl)) { return; }
+            JsonFileStore.Save(DefaultSolutionPath(environmentUrl), solution);
+        }
+
+        public void ClearDefaultSolution(string environmentUrl)
+        {
+            if (string.IsNullOrEmpty(environmentUrl)) { return; }
+            JsonFileStore.Delete(DefaultSolutionPath(environmentUrl));
+        }
+
+        private static string DefaultSolutionPath(string environmentUrl) =>
+            System.IO.Path.Combine(JsonFileStore.RootDirectory, "default-solutions", JsonFileStore.HashKey(environmentUrl) + ".json");
 
         private void RememberEnvironment(StoredConnection stored)
         {
