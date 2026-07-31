@@ -34,6 +34,9 @@ Dataverse environment and lets you browse its metadata.
 - Filter the list down to a specific solution — your choice is remembered per environment and
   re-applied automatically the next time you connect to it, until you clear the filter
 - Expand any entity to see its attributes, types, and whether each field is the primary ID or primary name
+- Shows each entity's real Dataverse icon (fetched from its SVG icon web resource and cached locally per
+  environment) once it loads, falling back to a generic table icon for entities without one or if the
+  icon can't be rendered
 - Right-click an entity to generate an early-bound C# class
 - Right-click a Picklist, State, or Status field to generate a standalone enum
 

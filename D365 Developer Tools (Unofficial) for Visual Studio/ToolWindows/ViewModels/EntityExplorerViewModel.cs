@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.CodeGen;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Connection;
@@ -129,6 +130,9 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             {
                 JsonFileStore.Save(EntityCachePath(environmentUrl), _allEntities.Select(e => e.Entity).ToList());
             }
+
+            // Never blocks the list itself — icons pop in progressively once fetched/rendered.
+            LoadIconsAsync().FileAndForget("D365DeveloperTools/LoadEntityIcons");
         }
 
         private bool TryLoadFromCache(string environmentUrl)
@@ -144,6 +148,73 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
 
         private static string EntityCachePath(string environmentUrl) =>
             System.IO.Path.Combine(JsonFileStore.RootDirectory, "entity-cache", JsonFileStore.HashKey(environmentUrl) + ".json");
+
+        /// <summary>
+        /// Fetches (or reuses a disk-cached copy of) each distinct entity icon's SVG, renders it off the
+        /// UI thread, then assigns the result to every matching node. Best-effort throughout — a failed
+        /// fetch or an unrenderable SVG just leaves that entity showing the generic fallback icon.
+        /// </summary>
+        private async Task LoadIconsAsync()
+        {
+            var environmentUrl = _connectionManager.Connection?.EnvironmentUrl;
+            if (environmentUrl == null) { return; }
+
+            var entitiesByIconName = _allEntities
+                .Where(e => e.Entity.IconVectorName != null)
+                .ToLookup(e => e.Entity.IconVectorName);
+            if (entitiesByIconName.Count == 0) { return; }
+
+            var svgByName = JsonFileStore.Load<Dictionary<string, string>>(EntityIconCachePath(environmentUrl))
+                ?? new Dictionary<string, string>();
+
+            var missing = entitiesByIconName.Select(g => g.Key).Where(n => !svgByName.ContainsKey(n)).ToList();
+            if (missing.Count > 0)
+            {
+                Dictionary<string, byte[]> fetched;
+                try
+                {
+                    fetched = await _client.GetIconSvgContentAsync(missing).ConfigureAwait(true);
+                }
+                catch
+                {
+                    fetched = new Dictionary<string, byte[]>();
+                }
+
+                if (fetched.Count > 0)
+                {
+                    foreach (var pair in fetched) { svgByName[pair.Key] = Convert.ToBase64String(pair.Value); }
+                    JsonFileStore.Save(EntityIconCachePath(environmentUrl), svgByName);
+                }
+            }
+
+            var rendered = await Task.Run(() =>
+            {
+                var images = new Dictionary<string, ImageSource>();
+                foreach (var name in entitiesByIconName.Select(g => g.Key))
+                {
+                    if (!svgByName.TryGetValue(name, out var base64)) { continue; }
+
+                    byte[] svgBytes;
+                    try { svgBytes = Convert.FromBase64String(base64); }
+                    catch (FormatException) { continue; }
+
+                    var image = EntityIconRenderer.TryRender(svgBytes);
+                    if (image != null) { images[name] = image; }
+                }
+                return images;
+            }).ConfigureAwait(true);
+
+            foreach (var group in entitiesByIconName)
+            {
+                if (rendered.TryGetValue(group.Key, out var image))
+                {
+                    foreach (var entity in group) { entity.IconSource = image; }
+                }
+            }
+        }
+
+        private static string EntityIconCachePath(string environmentUrl) =>
+            System.IO.Path.Combine(JsonFileStore.RootDirectory, "entity-icons", JsonFileStore.HashKey(environmentUrl) + ".json");
 
         public Task RefreshAsync() => RefreshAsync(showLoading: true);
 
