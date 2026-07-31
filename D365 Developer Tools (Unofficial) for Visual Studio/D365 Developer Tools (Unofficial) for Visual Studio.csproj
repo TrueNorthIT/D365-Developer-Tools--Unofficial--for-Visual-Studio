@@ -35,6 +35,54 @@
     <None Include="README.md" />
   </ItemGroup>
 
+  <!-- ProjectTemplates\CSharp\D365Plugin\ is raw .vstemplate content (with $safeprojectname$ tokens),
+       not real source of this extension - exclude its .cs file from compilation. -->
+  <ItemGroup>
+    <Compile Remove="ProjectTemplates\**\*.cs" />
+  </ItemGroup>
+
+  <!-- Zips the D365 Plugin project template into the VSIX as a plain Content asset instead of relying
+       on the classic VSSDK "VSTemplate item + TemplateProjectOutputGroup" auto-zip pipeline: in this
+       VssdkCompatibleExtension + VisualStudio.Extensibility hybrid project, that pipeline resolves the
+       manifest's output-group placeholder to a bare filename ("D365Plugin.zip") but never actually
+       copies the zip into the built .vsix, so the referenced asset is silently missing at install
+       time. Pre-zipping and including it like any other Content file is the documented workaround. -->
+  <PropertyGroup>
+    <D365PluginTemplateSourceDir>$(MSBuildProjectDirectory)\ProjectTemplates\CSharp\D365Plugin\</D365PluginTemplateSourceDir>
+  </PropertyGroup>
+
+  <!--
+    D365PluginTemplateZip is deliberately NOT a top-level property: $(IntermediateOutputPath) isn't
+    assigned its real value ("obj\Debug\net472\") until Sdk.targets (imported after all of this file's
+    content) runs its own PropertyGroups, so a top-level property referencing it here would
+    permanently capture an empty string. Referencing it inside a Target's attributes/tasks instead
+    works, because target execution happens only after the whole project has finished evaluating.
+
+    The Content item is added in a second, unconditional target (no Inputs/Outputs) rather than inside
+    ZipD365PluginTemplate itself, because an up-to-date incremental build skips that target's body
+    entirely — including any nested <ItemGroup> — which would silently drop the item on every build
+    after the first.
+  -->
+  <Target Name="ZipD365PluginTemplate" BeforeTargets="BeforeBuild"
+          Inputs="$(D365PluginTemplateSourceDir)D365Plugin.vstemplate;$(D365PluginTemplateSourceDir)Plugin1.cs;$(D365PluginTemplateSourceDir)ProjectTemplate.csproj"
+          Outputs="$(MSBuildProjectDirectory)\$(IntermediateOutputPath)ProjectTemplates\D365Plugin.zip">
+    <PropertyGroup>
+      <_D365PluginTemplateZip>$(MSBuildProjectDirectory)\$(IntermediateOutputPath)ProjectTemplates\D365Plugin.zip</_D365PluginTemplateZip>
+    </PropertyGroup>
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(_D365PluginTemplateZip)'))" />
+    <ZipDirectory SourceDirectory="$(D365PluginTemplateSourceDir)" DestinationFile="$(_D365PluginTemplateZip)" Overwrite="true" />
+  </Target>
+
+  <Target Name="AddD365PluginTemplateContentItem" BeforeTargets="BeforeBuild" AfterTargets="ZipD365PluginTemplate">
+    <ItemGroup>
+      <Content Include="$(MSBuildProjectDirectory)\$(IntermediateOutputPath)ProjectTemplates\D365Plugin.zip" Link="ProjectTemplates\D365Plugin.zip">
+        <IncludeInVSIX>true</IncludeInVSIX>
+        <VSIXSubPath>ProjectTemplates</VSIXSubPath>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
     <Reference Include="EnvDTE" />
     <Reference Include="EnvDTE80" />
