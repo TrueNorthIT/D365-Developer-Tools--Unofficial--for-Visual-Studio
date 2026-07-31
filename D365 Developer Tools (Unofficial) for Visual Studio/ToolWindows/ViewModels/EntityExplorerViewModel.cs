@@ -103,7 +103,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
 
             if (IsConnected)
             {
-                RefreshAsync().FileAndForget("D365DeveloperTools/RefreshEntities");
+                LoadEntitiesAsync().FileAndForget("D365DeveloperTools/RefreshEntities");
             }
             else
             {
@@ -112,6 +112,12 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
                 _solutionFilterIds = null;
                 SolutionFilterName = null;
             }
+        }
+
+        private async Task LoadEntitiesAsync()
+        {
+            await RefreshAsync().ConfigureAwait(true);
+            await ApplyDefaultSolutionAsync().ConfigureAwait(true);
         }
 
         public async Task RefreshAsync()
@@ -132,6 +138,27 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             finally
             {
                 IsLoadingEntities = false;
+            }
+        }
+
+        /// <summary>Re-applies the solution filter last picked for this environment (see ShowSolutionPickerAsync), if any.</summary>
+        private async Task ApplyDefaultSolutionAsync()
+        {
+            var environmentUrl = _connectionManager.Connection?.EnvironmentUrl;
+            var defaultSolution = environmentUrl == null ? null : _connectionManager.GetDefaultSolution(environmentUrl);
+            if (defaultSolution == null) { return; }
+
+            try
+            {
+                _solutionFilterIds = await _client.GetSolutionEntityIdsAsync(defaultSolution.SolutionId).ConfigureAwait(true);
+                SolutionFilterName = defaultSolution.FriendlyName;
+                OnPropertyChanged(nameof(HasSolutionFilter));
+                EntitiesView.Refresh();
+            }
+            catch
+            {
+                // The remembered solution may have been deleted/renamed since — leave unfiltered and
+                // let the user re-pick one manually.
             }
         }
 
@@ -179,6 +206,9 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             SolutionFilterName = pick.Value.FriendlyName;
             OnPropertyChanged(nameof(HasSolutionFilter));
             EntitiesView.Refresh();
+
+            var environmentUrl = _connectionManager.Connection?.EnvironmentUrl;
+            if (environmentUrl != null) { _connectionManager.SetDefaultSolution(environmentUrl, pick.Value); }
         }
 
         public void ClearSolutionFilter()
@@ -187,6 +217,9 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             SolutionFilterName = null;
             OnPropertyChanged(nameof(HasSolutionFilter));
             EntitiesView.Refresh();
+
+            var environmentUrl = _connectionManager.Connection?.EnvironmentUrl;
+            if (environmentUrl != null) { _connectionManager.ClearDefaultSolution(environmentUrl); }
         }
 
         // ── Codegen actions (invoked from the tree's context menus) ─────────
