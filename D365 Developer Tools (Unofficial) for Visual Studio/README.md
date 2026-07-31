@@ -216,6 +216,11 @@ That's it. The extension starts a local token-vending bridge (`%LocalAppData%\D3
 whenever you're connected; the MCP server reads from it so Claude always has a fresh token without
 storing any credentials.
 
+The extension also posts a brief "D365: MCP server active/inactive" message to Visual Studio's status
+bar whenever the bridge starts or stops. Visual Studio's status bar only has one shared text slot, so
+this message is best-effort — other activity (including the "Connected to..." message) can overwrite it
+immediately.
+
 > If the `d365` server shows as disconnected in `/mcp`, make sure D365 Developer Tools is connected in
 > Visual Studio first.
 
