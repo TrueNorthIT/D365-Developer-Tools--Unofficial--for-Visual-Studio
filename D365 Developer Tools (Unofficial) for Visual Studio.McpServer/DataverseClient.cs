@@ -51,6 +51,16 @@ internal sealed class DataverseClient
             .ToList();
     }
 
+    public async Task<string> GetEntityDisplayNameAsync(string entityLogicalName, CancellationToken cancellationToken)
+    {
+        var raw = await RequestAsync<RawEntity>(
+            $"EntityDefinitions(LogicalName='{entityLogicalName}')?$select=SchemaName,DisplayName",
+            cancellationToken).ConfigureAwait(false);
+
+        var displayName = raw == null ? string.Empty : ExtractLabel(raw.DisplayName);
+        return string.IsNullOrEmpty(displayName) ? (raw?.SchemaName ?? entityLogicalName) : displayName;
+    }
+
     public async Task<List<AttributeDefinition>> GetAttributesAsync(string entityLogicalName, CancellationToken cancellationToken)
     {
         var raw = await FetchPagedAsync<RawAttribute>(

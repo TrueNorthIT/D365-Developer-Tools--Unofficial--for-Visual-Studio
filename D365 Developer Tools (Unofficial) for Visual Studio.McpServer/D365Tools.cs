@@ -69,6 +69,7 @@ internal sealed class D365Tools(DataverseClient client)
         [Description("Field logical names to include. Omit to include all fields.")] string[]? fields = null,
         CancellationToken cancellationToken = default)
     {
+        var entityDisplayName = await client.GetEntityDisplayNameAsync(entityLogicalName, cancellationToken).ConfigureAwait(false);
         var attributes = await client.GetAttributesAsync(entityLogicalName, cancellationToken).ConfigureAwait(false);
 
         if (fields is { Length: > 0 })
@@ -95,7 +96,7 @@ internal sealed class D365Tools(DataverseClient client)
             }
         }
 
-        return CodeGenerator.GenerateClassFile(entityLogicalName, attributes, enumNames, enumBlocks);
+        return CodeGenerator.GenerateClassFile(entityLogicalName, entityDisplayName, attributes, enumNames, enumBlocks);
     }
 
     [McpServerTool(Name = "generate_enum"), Description("Generate a C# enum for a Picklist, State, or Status attribute.")]
