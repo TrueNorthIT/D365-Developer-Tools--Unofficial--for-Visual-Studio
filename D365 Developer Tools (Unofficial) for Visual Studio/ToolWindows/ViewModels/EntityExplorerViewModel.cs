@@ -10,6 +10,7 @@ using D365_Developer_Tools__Unofficial__for_Visual_Studio.CodeGen;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Connection;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse;
+using D365_Developer_Tools__Unofficial__for_Visual_Studio.Persistence;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Mvvm;
 using Microsoft.VisualStudio.Shell;
@@ -116,13 +117,39 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
 
         private async Task LoadEntitiesAsync()
         {
-            await RefreshAsync().ConfigureAwait(true);
+            var environmentUrl = _connectionManager.Connection?.EnvironmentUrl;
+            var shownFromCache = environmentUrl != null && TryLoadFromCache(environmentUrl);
+
+            // If a cached list is already on screen, refresh silently in the background instead of
+            // flashing the loading spinner over data the user can already see.
+            await RefreshAsync(showLoading: !shownFromCache).ConfigureAwait(true);
             await ApplyDefaultSolutionAsync().ConfigureAwait(true);
+
+            if (environmentUrl != null && LoadError == null)
+            {
+                JsonFileStore.Save(EntityCachePath(environmentUrl), _allEntities.Select(e => e.Entity).ToList());
+            }
         }
 
-        public async Task RefreshAsync()
+        private bool TryLoadFromCache(string environmentUrl)
         {
-            IsLoadingEntities = true;
+            var cached = JsonFileStore.Load<List<EntityDefinition>>(EntityCachePath(environmentUrl));
+            if (cached == null || cached.Count == 0) { return false; }
+
+            _allEntities = cached.Select(e => new EntityNodeViewModel(e, _client)).ToList();
+            Entities.Clear();
+            foreach (var entity in _allEntities) { Entities.Add(entity); }
+            return true;
+        }
+
+        private static string EntityCachePath(string environmentUrl) =>
+            System.IO.Path.Combine(JsonFileStore.RootDirectory, "entity-cache", JsonFileStore.HashKey(environmentUrl) + ".json");
+
+        public Task RefreshAsync() => RefreshAsync(showLoading: true);
+
+        private async Task RefreshAsync(bool showLoading)
+        {
+            if (showLoading) { IsLoadingEntities = true; }
             LoadError = null;
             try
             {
@@ -137,7 +164,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             }
             finally
             {
-                IsLoadingEntities = false;
+                if (showLoading) { IsLoadingEntities = false; }
             }
         }
 

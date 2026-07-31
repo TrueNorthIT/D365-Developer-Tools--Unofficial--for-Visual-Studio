@@ -29,6 +29,8 @@ A tool window (**Tools → D365 Developer Tools → D365: Show Entity Explorer**
 Dataverse environment and lets you browse its metadata.
 
 - Lists all entities, searchable by name
+- The list for an environment is cached locally, so re-opening it (or reconnecting) shows the entities
+  instantly while a fresh copy loads silently in the background
 - Filter the list down to a specific solution — your choice is remembered per environment and
   re-applied automatically the next time you connect to it, until you clear the filter
 - Expand any entity to see its attributes, types, and whether each field is the primary ID or primary name
