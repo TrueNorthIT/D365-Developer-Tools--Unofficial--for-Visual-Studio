@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
+using System.Windows.Media;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Mvvm;
 using Microsoft.VisualStudio.Shell;
@@ -18,6 +19,10 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         public string DisplayName => Entity.DisplayName;
 
         public ObservableCollection<AttributeNodeViewModel> Attributes { get; } = new ObservableCollection<AttributeNodeViewModel>();
+
+        /// <summary>The entity's real Dataverse icon, set asynchronously after the tree already shows a generic fallback icon; null until then (or if it has/needs none).</summary>
+        private ImageSource _iconSource;
+        public ImageSource IconSource { get => _iconSource; set => SetProperty(ref _iconSource, value); }
 
         private bool _isExpanded;
         public bool IsExpanded

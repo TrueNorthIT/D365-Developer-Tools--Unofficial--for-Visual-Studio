@@ -7,6 +7,9 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         public string SchemaName { get; set; }
         public string DisplayName { get; set; }
         public bool IsCustom { get; set; }
+
+        /// <summary>Web resource name of this entity's SVG icon, or null if it has none.</summary>
+        public string IconVectorName { get; set; }
     }
 
     internal sealed class AttributeDefinition

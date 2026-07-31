@@ -25,7 +25,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
 
         public async Task<List<EntityDefinition>> GetEntitiesAsync()
         {
-            var url = ApiUrl("EntityDefinitions", "$select=MetadataId,LogicalName,SchemaName,DisplayName,IsCustomEntity");
+            var url = ApiUrl("EntityDefinitions", "$select=MetadataId,LogicalName,SchemaName,DisplayName,IsCustomEntity,IconVectorName");
             var raw = await FetchPagedAsync<EntityDefinitionDto>(url).ConfigureAwait(false);
 
             return raw
@@ -36,9 +36,48 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                     SchemaName = e.SchemaName,
                     DisplayName = string.IsNullOrEmpty(e.DisplayName.ExtractLabel()) ? e.SchemaName : e.DisplayName.ExtractLabel(),
                     IsCustom = e.IsCustomEntity,
+                    IconVectorName = string.IsNullOrEmpty(e.IconVectorName) ? null : e.IconVectorName,
                 })
                 .OrderBy(e => e.LogicalName, StringComparer.Ordinal)
                 .ToList();
+        }
+
+        /// <summary>
+        /// Batch-fetches raw SVG bytes for the given (distinct) icon web resource names, keyed by name.
+        /// Best-effort: a failed batch or a missing/non-SVG resource is simply absent from the result —
+        /// icons are cosmetic, so callers should never let a lookup failure block anything else.
+        /// </summary>
+        public async Task<Dictionary<string, byte[]>> GetIconSvgContentAsync(IReadOnlyCollection<string> webResourceNames)
+        {
+            const int batchSize = 15; // keeps the $filter well under Dataverse's URL length limits
+            var names = webResourceNames.Where(n => !string.IsNullOrEmpty(n)).Distinct().ToList();
+            var result = new Dictionary<string, byte[]>();
+
+            for (var i = 0; i < names.Count; i += batchSize)
+            {
+                var batch = names.Skip(i).Take(batchSize).ToList();
+                var filter = string.Join(" or ", batch.Select(n => $"name eq '{EscapeODataLiteral(n)}'"));
+                var url = ApiUrl("webresourceset", "$select=name,content", $"$filter={filter}");
+
+                List<WebResourceContentDto> raw;
+                try
+                {
+                    raw = await FetchPagedAsync<WebResourceContentDto>(url).ConfigureAwait(false);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                foreach (var item in raw)
+                {
+                    if (string.IsNullOrEmpty(item.Content)) { continue; }
+                    try { result[item.Name] = Convert.FromBase64String(item.Content); }
+                    catch (FormatException) { /* not actually base64 — skip */ }
+                }
+            }
+
+            return result;
         }
 
         public async Task<List<AttributeDefinition>> GetAttributesAsync(string entityLogicalName)

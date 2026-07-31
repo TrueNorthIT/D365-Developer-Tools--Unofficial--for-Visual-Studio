@@ -17,6 +17,7 @@
             </ResourceDictionary.MergedDictionaries>
 
         <conv:BoolToVisibilityConverter x:Key="BoolToVisibleConverter" />
+        <conv:NullToVisibilityConverter x:Key="NullToVisibleConverter" />
         <dlg:EmptyToCollapsedConverter x:Key="EmptyToCollapsedConverter" />
 
         <ContextMenu x:Key="EntityContextMenu">
@@ -50,7 +51,10 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <img:CrispImage Grid.Column="0" Width="16" Height="16" Margin="0,0,4,0" VerticalAlignment="Center" Moniker="{x:Static catalog:KnownMonikers.Table}" />
+                <Grid Grid.Column="0" Width="16" Height="16" Margin="0,0,4,0" VerticalAlignment="Center">
+                    <img:CrispImage Moniker="{x:Static catalog:KnownMonikers.Table}" />
+                    <Image Source="{Binding IconSource}" Visibility="{Binding IconSource, Converter={StaticResource NullToVisibleConverter}}" />
+                </Grid>
                 <TextBlock Grid.Column="1" Text="{Binding DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                 <TextBlock Grid.Column="2" Margin="6,0,0,0" Opacity="0.6" FontSize="11" Text="{Binding LogicalName}" />
             </Grid>
