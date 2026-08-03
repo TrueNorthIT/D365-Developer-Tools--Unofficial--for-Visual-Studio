@@ -42,6 +42,46 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         public int Rank { get; set; }
         public bool IsEnabled { get; set; }
         public string FilteringAttributes { get; set; }
+        public string Description { get; set; }
+        public string UnsecureConfiguration { get; set; }
+
+        /// <summary>Null when the step runs as the calling user (the default) rather than an impersonated one.</summary>
+        public string ImpersonatingUserId { get; set; }
+
+        /// <summary>Null when the step has no secure configuration record yet. Dataverse never returns the secure value itself, only whether one exists.</summary>
+        public string SecureConfigId { get; set; }
+    }
+
+    internal sealed class SystemUserOption
+    {
+        public string UserId { get; set; }
+        public string FullName { get; set; }
+    }
+
+    /// <summary>Everything needed to create or update an SdkMessageProcessingStep — grouped here rather than as a long positional parameter list.</summary>
+    internal sealed class StepRegistrationDetails
+    {
+        public string SdkMessageId { get; set; }
+
+        /// <summary>Null for "(all entities)".</summary>
+        public string SdkMessageFilterId { get; set; }
+        public string Name { get; set; }
+        public int Stage { get; set; }
+        public int Mode { get; set; }
+        public int Rank { get; set; }
+        public string FilteringAttributes { get; set; }
+        public string SolutionUniqueName { get; set; }
+        public string Description { get; set; }
+        public string UnsecureConfiguration { get; set; }
+
+        /// <summary>Null to run as the calling user (the default).</summary>
+        public string ImpersonatingUserId { get; set; }
+
+        /// <summary>Null/empty means "leave the secure configuration as-is" on update (Dataverse never returns its value, so a blank field isn't a request to clear it).</summary>
+        public string SecureConfiguration { get; set; }
+
+        /// <summary>Update only: the step's current secure-config record ID, if it already has one.</summary>
+        public string ExistingSecureConfigId { get; set; }
     }
 
     internal sealed class SdkMessageStepImageDefinition

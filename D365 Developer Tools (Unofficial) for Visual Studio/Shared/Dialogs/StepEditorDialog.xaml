@@ -5,7 +5,7 @@
         xmlns:controls="clr-namespace:D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Controls"
         xmlns:vsp="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
         x:ClassModifier="internal"
-        Title="{Binding DialogTitle}" Height="440" Width="480"
+        Title="{Binding DialogTitle}" Height="620" Width="480"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
@@ -23,6 +23,10 @@
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -75,7 +79,25 @@
         <controls:FilterableComboBox Grid.Row="8" Grid.Column="1" Margin="0,4"
                   ItemsSource="{Binding Solutions}" DisplayMemberPath="FriendlyName" SelectedItem="{Binding SelectedSolution}" />
 
-        <StackPanel Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+        <TextBlock Grid.Row="9" Grid.Column="0" VerticalAlignment="Center" Text="Run in user's context" />
+        <controls:FilterableComboBox Grid.Row="9" Grid.Column="1" Margin="0,4"
+                  ItemsSource="{Binding ImpersonationUsers}" DisplayMemberPath="FullName" SelectedItem="{Binding SelectedImpersonationUser}" />
+
+        <TextBlock Grid.Row="10" Grid.Column="0" VerticalAlignment="Center" Text="Description" />
+        <TextBox Grid.Row="10" Grid.Column="1" Margin="0,4" Padding="3" Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Grid.Row="11" Grid.Column="0" VerticalAlignment="Center" Text="Unsecure config" />
+        <TextBox Grid.Row="11" Grid.Column="1" Margin="0,4" Padding="3" Text="{Binding UnsecureConfiguration, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Grid.Row="12" Grid.Column="0" VerticalAlignment="Top" Margin="0,4,0,0" Text="Secure config" />
+        <StackPanel Grid.Row="12" Grid.Column="1">
+            <TextBox Margin="0,4" Padding="3" Text="{Binding SecureConfiguration, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Text="Leave blank to keep the existing value unchanged — Dataverse never returns it for display."
+                       Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibleConverter}}"
+                       TextWrapping="Wrap" FontSize="10" Opacity="0.7" Margin="0,0,0,4" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="14" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button Content="{Binding OkButtonLabel}" Width="80" IsDefault="True" Click="OnOk" Margin="0,0,8,0" />
             <Button Content="Cancel" Width="80" IsCancel="True" />
         </StackPanel>

@@ -47,12 +47,26 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse.Dto
         public int Rank { get; set; }
         public int StateCode { get; set; }
         public string FilteringAttributes { get; set; }
+        public string Description { get; set; }
+        public string Configuration { get; set; }
 
         [JsonProperty("_sdkmessageid_value")]
         public string SdkMessageIdValue { get; set; }
 
         [JsonProperty("_sdkmessagefilterid_value")]
         public string SdkMessageFilterIdValue { get; set; }
+
+        [JsonProperty("_impersonatinguserid_value")]
+        public string ImpersonatingUserIdValue { get; set; }
+
+        [JsonProperty("_sdkmessageprocessingstepsecureconfigid_value")]
+        public string SecureConfigIdValue { get; set; }
+    }
+
+    internal sealed class SystemUserDto
+    {
+        public string SystemUserId { get; set; }
+        public string FullName { get; set; }
     }
 
     internal sealed class SdkMessageDto

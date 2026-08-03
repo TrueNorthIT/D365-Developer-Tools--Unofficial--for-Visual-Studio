@@ -15,10 +15,14 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs
     {
         private static readonly SdkMessageFilterOption AllEntitiesOption = new SdkMessageFilterOption { SdkMessageFilterId = null, EntityLogicalName = "(all entities)" };
         private static readonly DataverseSolution NoSolutionOption = new DataverseSolution { SolutionId = null, FriendlyName = "(none)" };
+        private static readonly SystemUserOption CallingUserOption = new SystemUserOption { UserId = null, FullName = "(calling user)" };
 
         private readonly DataverseClient _client;
         private readonly IUserPrompts _prompts;
         private string _filteringAttributes;
+
+        /// <summary>Set by LoadForEditAsync; null on Add (there's nothing to preserve yet) or when the step has no secure config.</summary>
+        private string _existingSecureConfigId;
 
         public string PluginTypeFriendlyName { get; }
         public bool IsEditMode { get; }
@@ -28,6 +32,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs
         public ObservableCollection<SdkMessageOption> Messages { get; } = new ObservableCollection<SdkMessageOption>();
         public ObservableCollection<SdkMessageFilterOption> Entities { get; } = new ObservableCollection<SdkMessageFilterOption>();
         public ObservableCollection<DataverseSolution> Solutions { get; } = new ObservableCollection<DataverseSolution>();
+        public ObservableCollection<SystemUserOption> ImpersonationUsers { get; } = new ObservableCollection<SystemUserOption>();
         public IReadOnlyList<PluginOption> Stages => PluginOptionLabels.RegisterableStages;
         public IReadOnlyList<PluginOption> Modes => PluginOptionLabels.RegisterableModes;
 
@@ -76,6 +81,19 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs
         private DataverseSolution _selectedSolution;
         public DataverseSolution SelectedSolution { get => _selectedSolution; set => SetProperty(ref _selectedSolution, value); }
 
+        private SystemUserOption _selectedImpersonationUser;
+        public SystemUserOption SelectedImpersonationUser { get => _selectedImpersonationUser; set => SetProperty(ref _selectedImpersonationUser, value); }
+
+        private string _description;
+        public string Description { get => _description; set => SetProperty(ref _description, value); }
+
+        private string _unsecureConfiguration;
+        public string UnsecureConfiguration { get => _unsecureConfiguration; set => SetProperty(ref _unsecureConfiguration, value); }
+
+        /// <summary>Always starts blank in edit mode — Dataverse never returns the existing secure value. Leaving this blank on update keeps whatever is already stored, it does not clear it.</summary>
+        private string _secureConfiguration;
+        public string SecureConfiguration { get => _secureConfiguration; set => SetProperty(ref _secureConfiguration, value); }
+
         public bool IsUpdateMessage => string.Equals(SelectedMessage?.Name, "Update", StringComparison.OrdinalIgnoreCase);
         public string FilteringAttributesSummary => string.IsNullOrEmpty(_filteringAttributes) ? "(all attributes)" : _filteringAttributes;
         public string FilteringAttributes => _filteringAttributes;
@@ -115,6 +133,12 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs
             {
                 SelectedSolution = NoSolutionOption;
             }
+
+            var users = await _client.GetUsersAsync().ConfigureAwait(true);
+            ImpersonationUsers.Clear();
+            ImpersonationUsers.Add(CallingUserOption);
+            foreach (var u in users) { ImpersonationUsers.Add(u); }
+            SelectedImpersonationUser = CallingUserOption;
 
             SelectedStage = Stages.FirstOrDefault(s => s.Value == 40) ?? Stages.FirstOrDefault();
             SelectedMode = Modes.FirstOrDefault(m => m.Value == 0);
@@ -166,7 +190,36 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs
             SelectedSolution = containingSolutions.Count == 1
                 ? Solutions.FirstOrDefault(s => s.SolutionId == containingSolutions[0].SolutionId) ?? NoSolutionOption
                 : NoSolutionOption;
+
+            var users = await _client.GetUsersAsync().ConfigureAwait(true);
+            ImpersonationUsers.Clear();
+            ImpersonationUsers.Add(CallingUserOption);
+            foreach (var u in users) { ImpersonationUsers.Add(u); }
+            SelectedImpersonationUser = ImpersonationUsers.FirstOrDefault(u => u.UserId == existingStep.ImpersonatingUserId) ?? CallingUserOption;
+
+            Description = existingStep.Description;
+            UnsecureConfiguration = existingStep.UnsecureConfiguration;
+            SecureConfiguration = string.Empty; // Dataverse never returns the existing value; see the property's doc comment.
+            _existingSecureConfigId = existingStep.SecureConfigId;
         }
+
+        /// <summary>Builds the request body for either CreateSdkMessageStepAsync or UpdateSdkMessageStepAsync.</summary>
+        public StepRegistrationDetails ToStepRegistrationDetails() => new StepRegistrationDetails
+        {
+            SdkMessageId = SelectedMessage.SdkMessageId,
+            SdkMessageFilterId = SelectedEntity?.SdkMessageFilterId,
+            Name = StepName,
+            Stage = SelectedStage.Value,
+            Mode = SelectedMode.Value,
+            Rank = int.Parse(Rank),
+            FilteringAttributes = FilteringAttributes,
+            SolutionUniqueName = SelectedSolution?.SolutionId != null ? SelectedSolution.UniqueName : null,
+            Description = Description,
+            UnsecureConfiguration = UnsecureConfiguration,
+            ImpersonatingUserId = SelectedImpersonationUser?.UserId,
+            SecureConfiguration = SecureConfiguration,
+            ExistingSecureConfigId = _existingSecureConfigId,
+        };
 
         private async Task LoadEntitiesForMessageAsync()
         {

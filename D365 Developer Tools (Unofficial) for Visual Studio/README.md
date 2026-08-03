@@ -57,8 +57,8 @@ plugin assemblies, similar to the Plugin Registration Tool.
   [Publish to Dataverse](#publish-to-dataverse)); the tree refreshes afterward
 - Right-click a plugin type → **Add Step...** to register a new step for it (see [Add Step](#add-step))
 - Right-click a step → **Edit Step...** to change its message, target entity, stage, execution mode,
-  execution order, filtering attributes, or solution — the same dialog as Add Step, pre-filled with the
-  step's current values
+  execution order, filtering attributes, solution, impersonation, configuration, or description — the
+  same dialog as Add Step, pre-filled with the step's current values
 - Right-click a step → **Enable**/**Disable** to activate or deactivate it in place, without opening the
   edit dialog
 
@@ -97,6 +97,10 @@ Step...** to register a new step for it without leaving Visual Studio.
   attributes.
 - **Solution** defaults to the one solution the plugin's assembly belongs to, if it's only in one;
   otherwise you can pick one from the list, or leave it unset.
+- Also sets **Run in user's context** (impersonation), **Description**, and unsecure/secure
+  **Configuration** — the secure configuration field is always blank when editing an existing step
+  (Dataverse never returns its value), and leaving it blank on update keeps whatever is already stored
+  rather than clearing it.
 
 ### C# Class Generation
 
