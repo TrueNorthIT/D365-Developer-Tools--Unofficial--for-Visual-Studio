@@ -399,14 +399,29 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
             return new HashSet<string>(raw.Select(t => t.TypeName), StringComparer.OrdinalIgnoreCase);
         }
 
-        public Task<string> CreatePluginTypeAsync(string pluginAssemblyId, string typeName, string friendlyName, string solutionUniqueName) =>
-            CreateRecordAsync("plugintypes", new Dictionary<string, object>
+        /// <summary>
+        /// workflowActivityGroupName should be non-null (and set to something meaningful, e.g. "{assembly} ({version})",
+        /// matching the Plugin Registration Tool's own default) for custom workflow activities — Dataverse won't surface
+        /// the activity in the classic process designer if it's left null. isworkflowactivity itself is read-only:
+        /// Dataverse determines it server-side from reflecting the assembly, so there's nothing to set for that part.
+        /// </summary>
+        public Task<string> CreatePluginTypeAsync(string pluginAssemblyId, string typeName, string friendlyName, string solutionUniqueName, string workflowActivityGroupName = null)
+        {
+            var body = new Dictionary<string, object>
             {
                 ["typename"] = typeName,
                 ["friendlyname"] = friendlyName,
                 ["name"] = typeName,
                 ["pluginassemblyid@odata.bind"] = $"/pluginassemblies({pluginAssemblyId})",
-            }, solutionUniqueName);
+            };
+
+            if (!string.IsNullOrEmpty(workflowActivityGroupName))
+            {
+                body["workflowactivitygroupname"] = workflowActivityGroupName;
+            }
+
+            return CreateRecordAsync("plugintypes", body, solutionUniqueName);
+        }
 
         /// <summary>Finds PluginType records matching a fully-qualified type name — may return more than one if the same type name exists in more than one assembly.</summary>
         public async Task<List<PluginTypeMatch>> FindPluginTypesByTypeNameAsync(string typeName)
