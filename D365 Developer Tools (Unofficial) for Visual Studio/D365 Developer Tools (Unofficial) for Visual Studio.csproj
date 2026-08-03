@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>D365_Developer_Tools__Unofficial__for_Visual_Studio</RootNamespace>
+    <AssemblyName>D365 Developer Tools %28Unofficial%29 for Visual Studio</AssemblyName>
+    <RuntimeIdentifiers>win</RuntimeIdentifiers>
+    <LangVersion>latest</LangVersion>
+
+    <!-- VSSDK-compatible VisualStudio.Extensibility extension: keeps the existing AsyncPackage,
+         ToolWindowPane, and WPF UI running in-process, while commands are contributed through the
+         new Extensibility model so they render correctly in Visual Studio 2026's ribbon shell
+         (classic VSCT-registered commands do not reliably surface there as of this build). -->
+    <VssdkCompatibleExtension>true</VssdkCompatibleExtension>
+
+    <GeneratePkgDefFile>true</GeneratePkgDefFile>
+    <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
+    <IncludeDebugSymbolsInLocalVSIXDeployment>false</IncludeDebugSymbolsInLocalVSIXDeployment>
+    <CopyBuildOutputToOutputDirectory>true</CopyBuildOutputToOutputDirectory>
+    <CopyOutputSymbolsToOutputDirectory>true</CopyOutputSymbolsToOutputDirectory>
+    <CreateVsixContainer>true</CreateVsixContainer>
+    <UseCodebase>true</UseCodebase>
+
+    <StartAction>Program</StartAction>
+    <StartProgram Condition="'$(DevEnvDir)' != ''">$(DevEnvDir)devenv.exe</StartProgram>
+    <StartArguments>/rootsuffix Exp</StartArguments>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="source.extension.vsixmanifest">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="README.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="EnvDTE" />
+    <Reference Include="EnvDTE80" />
+    <Reference Include="System.Design" />
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.0.32112.339" ExcludeAssets="runtime" NoWarn="NU1604" />
+    <PackageReference Include="Microsoft.VisualStudio.Extensibility.Sdk" Version="17.14.40608" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.VisualStudio.Extensibility.Build" Version="17.14.40608" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
+    <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.61.3" />
+    <PackageReference Include="Microsoft.Identity.Client.Desktop" Version="4.61.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>
