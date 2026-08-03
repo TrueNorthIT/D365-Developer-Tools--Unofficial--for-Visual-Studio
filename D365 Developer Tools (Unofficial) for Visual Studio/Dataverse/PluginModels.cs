@@ -13,6 +13,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         /// <summary>Null when the assembly wasn't deployed as part of a NuGet-style plugin package.</summary>
         public string PackageName { get; set; }
         public string PackageVersion { get; set; }
+        public string Description { get; set; }
     }
 
     internal sealed class PluginTypeDefinition

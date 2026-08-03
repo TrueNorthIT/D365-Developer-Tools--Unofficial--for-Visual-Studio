@@ -340,6 +340,26 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             _prompts.ShowInfo($"D365: Unregistered '{node.Name}'.");
         }
 
+        /// <summary>Edits an assembly's Description — the only field the Plugin Registration Tool itself allows editing after registration.</summary>
+        public async Task EditAssemblyDescriptionAsync(PluginAssemblyNodeViewModel node)
+        {
+            var newDescription = await _prompts.PromptTextAsync(
+                $"D365: Edit Description — {node.Name}", "Description", defaultValue: node.Description ?? string.Empty).ConfigureAwait(true);
+            if (newDescription == null) { return; }
+
+            try
+            {
+                await _client.UpdatePluginAssemblyDescriptionAsync(node.Assembly.PluginAssemblyId, newDescription).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                _prompts.ShowError($"D365: Failed to update the description: {ex.Message}");
+                return;
+            }
+
+            node.UpdateDescription(newDescription);
+        }
+
         /// <summary>Registers a new pre-/post-image on a step found in this tree.</summary>
         public async Task AddImageAsync(SdkMessageStepNodeViewModel node)
         {
