@@ -128,16 +128,8 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
 
             try
             {
-                await prompts.RunWithProgressAsync("D365: Registering step…", () => client.CreateSdkMessageStepAsync(
-                    pluginTypeId,
-                    viewModel.SelectedMessage.SdkMessageId,
-                    viewModel.SelectedEntity?.SdkMessageFilterId,
-                    viewModel.StepName,
-                    viewModel.SelectedStage.Value,
-                    viewModel.SelectedMode.Value,
-                    int.Parse(viewModel.Rank),
-                    viewModel.FilteringAttributes,
-                    viewModel.SelectedSolution?.SolutionId != null ? viewModel.SelectedSolution.UniqueName : null)).ConfigureAwait(true);
+                await prompts.RunWithProgressAsync("D365: Registering step…", () =>
+                    client.CreateSdkMessageStepAsync(pluginTypeId, viewModel.ToStepRegistrationDetails())).ConfigureAwait(true);
             }
             catch (Exception ex)
             {
