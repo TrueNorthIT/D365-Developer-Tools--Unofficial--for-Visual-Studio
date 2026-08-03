@@ -35,7 +35,19 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         public string SearchText
         {
             get => _searchText;
-            set { if (SetProperty(ref _searchText, value)) { EntitiesView.Refresh(); } }
+            set
+            {
+                if (SetProperty(ref _searchText, value))
+                {
+                    if (EntitiesView is ListCollectionView listView)
+                    {
+                        var query = value?.Trim() ?? string.Empty;
+                        listView.CustomSort = string.IsNullOrEmpty(query) ? null : new EntityRelevanceComparer(query);
+                    }
+
+                    EntitiesView.Refresh();
+                }
+            }
         }
 
         private string _solutionFilterName;
@@ -270,6 +282,18 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
 
             var text = SearchText.Trim().ToLowerInvariant();
             return node.LogicalName.ToLowerInvariant().Contains(text) || node.DisplayName.ToLowerInvariant().Contains(text);
+        }
+
+        /// <summary>Ranks entities by their best match across DisplayName/LogicalName, so e.g. typing "account" shows the "Account" table before other entities that merely contain "account" in their logical name somewhere.</summary>
+        private sealed class EntityRelevanceComparer : System.Collections.IComparer
+        {
+            private readonly string _query;
+            public EntityRelevanceComparer(string query) => _query = query;
+
+            public int Compare(object x, object y) => RankOf((EntityNodeViewModel)x).CompareTo(RankOf((EntityNodeViewModel)y));
+
+            private int RankOf(EntityNodeViewModel node) =>
+                Math.Min(SearchRelevance.Rank(node.DisplayName, _query), SearchRelevance.Rank(node.LogicalName, _query));
         }
 
         private async Task ShowSolutionPickerAsync()

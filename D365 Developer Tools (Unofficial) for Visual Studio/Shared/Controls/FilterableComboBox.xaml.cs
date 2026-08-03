@@ -100,9 +100,12 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Controls
         private void ApplyFilter(string text)
         {
             PART_ListBox.DisplayMemberPath = DisplayMemberPath;
-            PART_ListBox.ItemsSource = string.IsNullOrEmpty(text)
-                ? _allItems
-                : _allItems.Where(i => GetDisplayText(i).IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+
+            var matches = string.IsNullOrEmpty(text)
+                ? _allItems.AsEnumerable()
+                : _allItems.Where(i => GetDisplayText(i).IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0);
+
+            PART_ListBox.ItemsSource = SearchRelevance.OrderByRelevance(matches, text, GetDisplayText).ToList();
             PART_ListBox.SelectedIndex = PART_ListBox.Items.Count > 0 ? 0 : -1;
         }
 
