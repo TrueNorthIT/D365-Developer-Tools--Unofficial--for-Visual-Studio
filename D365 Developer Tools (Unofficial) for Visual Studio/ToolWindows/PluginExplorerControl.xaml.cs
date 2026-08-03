@@ -103,6 +103,54 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows
             }
         }
 
+        private void OnEditCustomApiClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<CustomApiNodeViewModel>(sender, out var node))
+            {
+                ViewModel.EditCustomApiAsync(node).FileAndForget("D365DeveloperTools/PluginExplorerEditCustomApi");
+            }
+        }
+
+        private void OnAddCustomApiRequestParameterClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<CustomApiNodeViewModel>(sender, out var node))
+            {
+                ViewModel.AddCustomApiParameterAsync(node, isRequestParameter: true).FileAndForget("D365DeveloperTools/PluginExplorerAddCustomApiRequestParameter");
+            }
+        }
+
+        private void OnAddCustomApiResponsePropertyClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<CustomApiNodeViewModel>(sender, out var node))
+            {
+                ViewModel.AddCustomApiParameterAsync(node, isRequestParameter: false).FileAndForget("D365DeveloperTools/PluginExplorerAddCustomApiResponseProperty");
+            }
+        }
+
+        private void OnUnregisterCustomApiClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<CustomApiNodeViewModel>(sender, out var node))
+            {
+                ViewModel.DeleteCustomApiAsync(node).FileAndForget("D365DeveloperTools/PluginExplorerUnregisterCustomApi");
+            }
+        }
+
+        private void OnEditCustomApiParameterClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<CustomApiParameterNodeViewModel>(sender, out var node))
+            {
+                ViewModel.EditCustomApiParameterAsync(node).FileAndForget("D365DeveloperTools/PluginExplorerEditCustomApiParameter");
+            }
+        }
+
+        private void OnUnregisterCustomApiParameterClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<CustomApiParameterNodeViewModel>(sender, out var node))
+            {
+                ViewModel.DeleteCustomApiParameterAsync(node).FileAndForget("D365DeveloperTools/PluginExplorerUnregisterCustomApiParameter");
+            }
+        }
+
         private static bool TryGetRowDataContext<T>(object sender, out T value) where T : class
         {
             value = null;

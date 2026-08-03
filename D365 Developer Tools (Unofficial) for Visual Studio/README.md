@@ -69,6 +69,19 @@ plugin assemblies, similar to the Plugin Registration Tool.
   not created or changed
 - Right-click an assembly → **Edit Description...** — its current description also shows as a tooltip
   on the row
+- **Custom APIs** — a separate top-level section (Custom APIs aren't owned by any one assembly, and can
+  exist without a linked plugin type at all) below the assembly tree
+  - **Add Custom API...** to register one: name, display name, unique name, description, solution,
+    binding type (Global/Entity/Entity Collection) and bound entity, allowed custom processing step
+    type, Function, Private, execute privilege, and an optional linked assembly + plugin type
+  - Right-click one → **Edit Custom API...** — binding type, bound entity, allowed processing step
+    type, and Function can't be changed after creation (Dataverse rejects the update), so those fields
+    are disabled rather than silently ignored
+  - Right-click one → **Add Request Parameter...** / **Add Response Property...**, or an existing one →
+    **Edit...**, to manage its typed parameters (Boolean/DateTime/Decimal/Entity/EntityCollection/
+    EntityReference/Float/Integer/Money/Picklist/String/StringArray/Guid)
+  - **Unregister...** on a Custom API, request parameter, or response property to delete it after
+    confirming
 
 ### Publish to Dataverse
 
