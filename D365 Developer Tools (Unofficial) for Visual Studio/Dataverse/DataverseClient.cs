@@ -525,6 +525,14 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
             }
         }
 
+        /// <summary>Activates or deactivates a registered step. Enabled = statecode 0/statuscode 1, Disabled = statecode 1/statuscode 2.</summary>
+        public Task SetSdkMessageStepEnabledAsync(string stepId, bool enabled) =>
+            UpdateRecordAsync("sdkmessageprocessingsteps", stepId, new
+            {
+                statecode = enabled ? 0 : 1,
+                statuscode = enabled ? 1 : 2,
+            });
+
         private async Task ClearSdkMessageStepFilterAsync(string stepId)
         {
             var url = $"{RecordUrl("sdkmessageprocessingsteps", stepId)}/sdkmessagefilterid/$ref";

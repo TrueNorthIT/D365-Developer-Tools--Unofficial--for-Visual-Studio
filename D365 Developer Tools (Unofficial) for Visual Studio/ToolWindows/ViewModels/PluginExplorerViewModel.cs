@@ -238,5 +238,21 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             var succeeded = await EditStepCommand.ExecuteAsync(_client, _prompts, node.Step, node.PluginTypeFriendlyName).ConfigureAwait(true);
             if (succeeded) { await node.ReloadAsync().ConfigureAwait(true); }
         }
+
+        /// <summary>Activates or deactivates a step in place, mirroring the Plugin Registration Tool's Enable/Disable commands.</summary>
+        public async Task SetStepEnabledAsync(SdkMessageStepNodeViewModel node, bool enabled)
+        {
+            try
+            {
+                await _client.SetSdkMessageStepEnabledAsync(node.Step.StepId, enabled).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                _prompts.ShowError($"D365: Failed to {(enabled ? "enable" : "disable")} the step: {ex.Message}");
+                return;
+            }
+
+            await node.ReloadAsync().ConfigureAwait(true);
+        }
     }
 }
