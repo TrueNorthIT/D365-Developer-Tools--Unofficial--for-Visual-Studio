@@ -36,7 +36,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared
         /// owner has no window of its own to force forward, so this hosts it under a temporary,
         /// invisible, always-on-top owner window instead.
         /// </summary>
-        public static void ShowMessage(string message, string title, MessageBoxButton button, MessageBoxImage icon)
+        public static MessageBoxResult ShowMessage(string message, string title, MessageBoxButton button, MessageBoxImage icon)
         {
             var owner = new Window
             {
@@ -53,7 +53,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared
             BringToFront(owner);
             try
             {
-                MessageBox.Show(owner, message, title, button, icon);
+                return MessageBox.Show(owner, message, title, button, icon);
             }
             finally
             {

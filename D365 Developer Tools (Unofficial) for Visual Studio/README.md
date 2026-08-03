@@ -61,6 +61,9 @@ plugin assemblies, similar to the Plugin Registration Tool.
   same dialog as Add Step, pre-filled with the step's current values
 - Right-click a step → **Enable**/**Disable** to activate or deactivate it in place, without opening the
   edit dialog
+- Right-click an assembly, plugin type, step, or image → **Unregister...** to delete it after
+  confirming — unregistering an assembly or type fails if steps still depend on it, the same
+  referential-integrity rule the Plugin Registration Tool enforces
 
 ### Publish to Dataverse
 

@@ -22,17 +22,25 @@
         <conv:InverseBoolConverter x:Key="InverseBoolConverter" />
         <dlg:EmptyToCollapsedConverter x:Key="EmptyToCollapsedConverter" />
 
+        <ContextMenu x:Key="AssemblyContextMenu">
+            <MenuItem Header="Unregister..." Click="OnUnregisterAssemblyClick" />
+        </ContextMenu>
         <ContextMenu x:Key="TypeContextMenu">
             <MenuItem Header="Add Step..." Click="OnAddStepClick" />
+            <MenuItem Header="Unregister..." Click="OnUnregisterTypeClick" />
         </ContextMenu>
         <ContextMenu x:Key="StepContextMenu">
             <MenuItem Header="Edit Step..." Click="OnEditStepClick" />
             <MenuItem Header="Enable" Click="OnEnableStepClick" IsEnabled="{Binding IsEnabled, Converter={StaticResource InverseBoolConverter}}" />
             <MenuItem Header="Disable" Click="OnDisableStepClick" IsEnabled="{Binding IsEnabled}" />
+            <MenuItem Header="Unregister..." Click="OnUnregisterStepClick" />
+        </ContextMenu>
+        <ContextMenu x:Key="ImageContextMenu">
+            <MenuItem Header="Unregister..." Click="OnUnregisterImageClick" />
         </ContextMenu>
 
         <DataTemplate x:Key="ImageTemplate">
-            <Grid Margin="0,1">
+            <Grid Margin="0,1" ContextMenu="{StaticResource ImageContextMenu}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
@@ -77,7 +85,7 @@
         </HierarchicalDataTemplate>
 
         <HierarchicalDataTemplate x:Key="AssemblyTemplate" ItemsSource="{Binding Types}" ItemTemplate="{StaticResource TypeTemplate}">
-            <Grid Margin="0,2">
+            <Grid Margin="0,2" ContextMenu="{StaticResource AssemblyContextMenu}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />

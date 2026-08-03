@@ -23,6 +23,9 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared
         void ShowInfo(string message);
         void ShowError(string message);
 
+        /// <summary>Yes/No confirmation for destructive actions (e.g. unregistering a record). True if the user chose Yes.</summary>
+        Task<bool> ConfirmAsync(string title, string message);
+
         Task<T> RunWithProgressAsync<T>(string title, Func<Task<T>> work);
         Task RunWithProgressAsync(string title, Func<Task> work);
     }
