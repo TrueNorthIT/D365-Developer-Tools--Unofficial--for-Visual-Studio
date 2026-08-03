@@ -89,8 +89,23 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         public string ImageId { get; set; }
         public string Name { get; set; }
         public string EntityAlias { get; set; }
+        public int ImageTypeValue { get; set; }
         public string ImageType { get; set; }
         public string Attributes { get; set; }
+    }
+
+    /// <summary>Everything needed to create or update an SdkMessageProcessingStepImage.</summary>
+    internal sealed class ImageRegistrationDetails
+    {
+        public string Name { get; set; }
+        public string EntityAlias { get; set; }
+        public int ImageType { get; set; }
+
+        /// <summary>Comma-separated attribute logical names.</summary>
+        public string Attributes { get; set; }
+
+        /// <summary>The Request message's target parameter name. "Target" covers every message images are realistically used with (Create/Update/Delete/Assign) — see the Message/Request Class Property table in Microsoft's entity-images docs for the handful of messages that differ.</summary>
+        public string MessagePropertyName { get; set; } = "Target";
     }
 
     /// <summary>Identifies an existing PluginAssembly or PluginPackage record found by name.</summary>
@@ -180,6 +195,13 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         {
             new PluginOption(0, "Synchronous"),
             new PluginOption(1, "Asynchronous"),
+        };
+
+        public static readonly IReadOnlyList<PluginOption> RegisterableImageTypes = new List<PluginOption>
+        {
+            new PluginOption(0, "Pre Image"),
+            new PluginOption(1, "Post Image"),
+            new PluginOption(2, "Both"),
         };
     }
 

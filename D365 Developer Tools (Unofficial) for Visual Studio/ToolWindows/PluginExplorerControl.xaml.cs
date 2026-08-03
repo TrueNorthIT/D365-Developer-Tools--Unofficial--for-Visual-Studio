@@ -47,6 +47,22 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows
             }
         }
 
+        private void OnAddImageClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<SdkMessageStepNodeViewModel>(sender, out var node))
+            {
+                ViewModel.AddImageAsync(node).FileAndForget("D365DeveloperTools/PluginExplorerAddImage");
+            }
+        }
+
+        private void OnEditImageClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<SdkMessageStepImageNodeViewModel>(sender, out var node))
+            {
+                ViewModel.EditImageAsync(node).FileAndForget("D365DeveloperTools/PluginExplorerEditImage");
+            }
+        }
+
         private void OnUnregisterAssemblyClick(object sender, RoutedEventArgs e)
         {
             if (TryGetRowDataContext<PluginAssemblyNodeViewModel>(sender, out var node))

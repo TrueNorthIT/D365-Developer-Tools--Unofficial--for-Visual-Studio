@@ -339,5 +339,19 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             if (node.Owner != null) { await node.Owner.ReloadImagesAsync().ConfigureAwait(true); }
             _prompts.ShowInfo($"D365: Unregistered '{node.Name}'.");
         }
+
+        /// <summary>Registers a new pre-/post-image on a step found in this tree.</summary>
+        public async Task AddImageAsync(SdkMessageStepNodeViewModel node)
+        {
+            var succeeded = await ImageEditorCommand.AddAsync(_client, _prompts, node.Step.StepId, node.Step.PrimaryEntity).ConfigureAwait(true);
+            if (succeeded) { await node.ReloadImagesAsync().ConfigureAwait(true); }
+        }
+
+        /// <summary>Edits an already-registered image found in this tree.</summary>
+        public async Task EditImageAsync(SdkMessageStepImageNodeViewModel node)
+        {
+            var succeeded = await ImageEditorCommand.EditAsync(_client, _prompts, node.Image, node.Owner?.Step.PrimaryEntity).ConfigureAwait(true);
+            if (succeeded && node.Owner != null) { await node.Owner.ReloadImagesAsync().ConfigureAwait(true); }
+        }
     }
 }

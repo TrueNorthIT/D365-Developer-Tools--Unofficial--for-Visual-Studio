@@ -64,6 +64,9 @@ plugin assemblies, similar to the Plugin Registration Tool.
 - Right-click an assembly, plugin type, step, or image → **Unregister...** to delete it after
   confirming — unregistering an assembly or type fails if steps still depend on it, the same
   referential-integrity rule the Plugin Registration Tool enforces
+- Right-click a step → **Add Image...**, or an existing image → **Edit Image...**, to set its name,
+  entity alias, image type (Pre/Post/Both), and attributes — previously images could only be viewed,
+  not created or changed
 
 ### Publish to Dataverse
 
