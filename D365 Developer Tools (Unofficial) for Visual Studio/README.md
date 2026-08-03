@@ -67,6 +67,8 @@ plugin assemblies, similar to the Plugin Registration Tool.
 - Right-click a step → **Add Image...**, or an existing image → **Edit Image...**, to set its name,
   entity alias, image type (Pre/Post/Both), and attributes — previously images could only be viewed,
   not created or changed
+- Right-click an assembly → **Edit Description...** — its current description also shows as a tooltip
+  on the row
 
 ### Publish to Dataverse
 

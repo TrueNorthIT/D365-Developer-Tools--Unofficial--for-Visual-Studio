@@ -17,6 +17,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse.Dto
         public string Version { get; set; }
         public int IsolationMode { get; set; }
         public int SourceType { get; set; }
+        public string Description { get; set; }
 
         [JsonProperty("_packageid_value")]
         public string PackageIdValue { get; set; }

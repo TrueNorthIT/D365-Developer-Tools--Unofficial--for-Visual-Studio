@@ -166,7 +166,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         {
             var url = ApiUrl(
                 "pluginassemblies",
-                "$select=pluginassemblyid,name,version,isolationmode,sourcetype,_packageid_value");
+                "$select=pluginassemblyid,name,version,isolationmode,sourcetype,description,_packageid_value");
 
             var raw = await FetchPagedAsync<PluginAssemblyDto>(url).ConfigureAwait(false);
 
@@ -190,6 +190,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                         SourceType = PluginOptionLabels.SourceType(a.SourceType),
                         PackageName = package?.Name,
                         PackageVersion = package?.Version,
+                        Description = a.Description,
                     };
                 })
                 .OrderBy(a => a.Name, StringComparer.Ordinal)
@@ -375,6 +376,10 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
 
         public Task UpdatePluginAssemblyContentAsync(string pluginAssemblyId, string contentBase64, string version) =>
             UpdateRecordAsync("pluginassemblies", pluginAssemblyId, new { content = contentBase64, version });
+
+        /// <summary>Description is the only assembly field the Plugin Registration Tool itself lets you edit after registration.</summary>
+        public Task UpdatePluginAssemblyDescriptionAsync(string pluginAssemblyId, string description) =>
+            UpdateRecordAsync("pluginassemblies", pluginAssemblyId, new { description });
 
         public Task<string> CreatePluginPackageAsync(string name, string contentBase64, string version, string solutionUniqueName) =>
             CreateRecordAsync("pluginpackages", new

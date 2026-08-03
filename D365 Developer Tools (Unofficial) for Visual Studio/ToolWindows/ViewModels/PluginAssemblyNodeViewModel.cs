@@ -21,6 +21,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         public string SourceType => Assembly.SourceType;
         public string PackageName => Assembly.PackageName;
         public bool HasPackage => !string.IsNullOrEmpty(Assembly.PackageName);
+        public string Description => Assembly.Description;
 
         public string SearchText => Name?.ToLowerInvariant() ?? string.Empty;
 
@@ -54,6 +55,13 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             // plugin types are lazy-loaded (WPF hides the chevron whenever HasItems is false).
             // LoadTypesAsync replaces this the moment the node is actually expanded.
             Types.Add(null);
+        }
+
+        /// <summary>Reflects a successfully saved description edit back into the tree without a full reload.</summary>
+        public void UpdateDescription(string description)
+        {
+            Assembly.Description = description;
+            OnPropertyChanged(nameof(Description));
         }
 
         /// <summary>Forces a reload of this assembly's plugin types, e.g. after unregistering one.</summary>

@@ -63,6 +63,14 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows
             }
         }
 
+        private void OnEditAssemblyDescriptionClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<PluginAssemblyNodeViewModel>(sender, out var node))
+            {
+                ViewModel.EditAssemblyDescriptionAsync(node).FileAndForget("D365DeveloperTools/PluginExplorerEditAssemblyDescription");
+            }
+        }
+
         private void OnUnregisterAssemblyClick(object sender, RoutedEventArgs e)
         {
             if (TryGetRowDataContext<PluginAssemblyNodeViewModel>(sender, out var node))

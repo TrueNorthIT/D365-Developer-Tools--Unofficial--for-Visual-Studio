@@ -23,6 +23,7 @@
         <dlg:EmptyToCollapsedConverter x:Key="EmptyToCollapsedConverter" />
 
         <ContextMenu x:Key="AssemblyContextMenu">
+            <MenuItem Header="Edit Description..." Click="OnEditAssemblyDescriptionClick" />
             <MenuItem Header="Unregister..." Click="OnUnregisterAssemblyClick" />
         </ContextMenu>
         <ContextMenu x:Key="TypeContextMenu">
@@ -95,7 +96,7 @@
                 </Grid.ColumnDefinitions>
                 <img:CrispImage Grid.Column="0" Width="16" Height="16" Margin="0,0,4,0" VerticalAlignment="Center"
                                 Moniker="{Binding HasPackage, Converter={StaticResource BoolToAssemblyIconConverter}}" />
-                <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="Bold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Description}" />
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
                     <TextBlock Margin="6,0,0,0" Opacity="0.6" FontSize="11" Text="{Binding PackageName}"
                                Visibility="{Binding HasPackage, Converter={StaticResource BoolToVisibleConverter}}" />
