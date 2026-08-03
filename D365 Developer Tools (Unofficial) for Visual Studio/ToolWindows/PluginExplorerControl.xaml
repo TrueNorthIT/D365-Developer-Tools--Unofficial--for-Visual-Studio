@@ -19,6 +19,7 @@
         <conv:BoolToVisibilityConverter x:Key="BoolToVisibleConverter" />
         <conv:BoolToOpacityConverter x:Key="BoolToOpacityConverter" />
         <conv:BoolToAssemblyIconConverter x:Key="BoolToAssemblyIconConverter" />
+        <conv:InverseBoolConverter x:Key="InverseBoolConverter" />
         <dlg:EmptyToCollapsedConverter x:Key="EmptyToCollapsedConverter" />
 
         <ContextMenu x:Key="TypeContextMenu">
@@ -26,6 +27,8 @@
         </ContextMenu>
         <ContextMenu x:Key="StepContextMenu">
             <MenuItem Header="Edit Step..." Click="OnEditStepClick" />
+            <MenuItem Header="Enable" Click="OnEnableStepClick" IsEnabled="{Binding IsEnabled, Converter={StaticResource InverseBoolConverter}}" />
+            <MenuItem Header="Disable" Click="OnDisableStepClick" IsEnabled="{Binding IsEnabled}" />
         </ContextMenu>
 
         <DataTemplate x:Key="ImageTemplate">

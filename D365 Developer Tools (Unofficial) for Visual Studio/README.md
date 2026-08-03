@@ -59,6 +59,8 @@ plugin assemblies, similar to the Plugin Registration Tool.
 - Right-click a step → **Edit Step...** to change its message, target entity, stage, execution mode,
   execution order, filtering attributes, or solution — the same dialog as Add Step, pre-filled with the
   step's current values
+- Right-click a step → **Enable**/**Disable** to activate or deactivate it in place, without opening the
+  edit dialog
 
 ### Publish to Dataverse
 

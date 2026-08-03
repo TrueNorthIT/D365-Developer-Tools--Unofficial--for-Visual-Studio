@@ -31,6 +31,22 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows
             }
         }
 
+        private void OnEnableStepClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<SdkMessageStepNodeViewModel>(sender, out var node))
+            {
+                ViewModel.SetStepEnabledAsync(node, enabled: true).FileAndForget("D365DeveloperTools/PluginExplorerEnableStep");
+            }
+        }
+
+        private void OnDisableStepClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<SdkMessageStepNodeViewModel>(sender, out var node))
+            {
+                ViewModel.SetStepEnabledAsync(node, enabled: false).FileAndForget("D365DeveloperTools/PluginExplorerDisableStep");
+            }
+        }
+
         private static bool TryGetRowDataContext<T>(object sender, out T value) where T : class
         {
             value = null;
