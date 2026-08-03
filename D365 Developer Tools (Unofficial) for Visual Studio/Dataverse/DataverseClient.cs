@@ -316,11 +316,33 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                     ImageId = i.SdkMessageProcessingStepImageId,
                     Name = i.Name,
                     EntityAlias = i.EntityAlias,
+                    ImageTypeValue = i.ImageType,
                     ImageType = PluginOptionLabels.ImageType(i.ImageType),
                     Attributes = i.Attributes,
                 })
                 .ToList();
         }
+
+        public Task<string> CreateSdkMessageStepImageAsync(string stepId, ImageRegistrationDetails details) =>
+            CreateRecordAsync("sdkmessageprocessingstepimages", new Dictionary<string, object>
+            {
+                ["name"] = details.Name,
+                ["entityalias"] = details.EntityAlias,
+                ["imagetype"] = details.ImageType,
+                ["attributes"] = details.Attributes,
+                ["messagepropertyname"] = details.MessagePropertyName,
+                ["sdkmessageprocessingstepid@odata.bind"] = $"/sdkmessageprocessingsteps({stepId})",
+            }, null);
+
+        public Task UpdateSdkMessageStepImageAsync(string imageId, ImageRegistrationDetails details) =>
+            UpdateRecordAsync("sdkmessageprocessingstepimages", imageId, new Dictionary<string, object>
+            {
+                ["name"] = details.Name,
+                ["entityalias"] = details.EntityAlias,
+                ["imagetype"] = details.ImageType,
+                ["attributes"] = details.Attributes,
+                ["messagepropertyname"] = details.MessagePropertyName,
+            });
 
         // ── Publishing plugin assemblies / packages ─────────────────────────────
 

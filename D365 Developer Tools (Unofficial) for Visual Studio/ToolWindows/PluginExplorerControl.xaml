@@ -33,9 +33,11 @@
             <MenuItem Header="Edit Step..." Click="OnEditStepClick" />
             <MenuItem Header="Enable" Click="OnEnableStepClick" IsEnabled="{Binding IsEnabled, Converter={StaticResource InverseBoolConverter}}" />
             <MenuItem Header="Disable" Click="OnDisableStepClick" IsEnabled="{Binding IsEnabled}" />
+            <MenuItem Header="Add Image..." Click="OnAddImageClick" />
             <MenuItem Header="Unregister..." Click="OnUnregisterStepClick" />
         </ContextMenu>
         <ContextMenu x:Key="ImageContextMenu">
+            <MenuItem Header="Edit Image..." Click="OnEditImageClick" />
             <MenuItem Header="Unregister..." Click="OnUnregisterImageClick" />
         </ContextMenu>
 
