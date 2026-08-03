@@ -410,6 +410,23 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                 .ToList();
         }
 
+        // ── Unregistering plugin assemblies / types / steps / images ───────────
+
+        /// <summary>Fails if any SdkMessageProcessingSteps still depend on this assembly's types — the same referential-integrity rule the Plugin Registration Tool relies on.</summary>
+        public Task DeletePluginAssemblyAsync(string pluginAssemblyId) => DeleteRecordAsync("pluginassemblies", pluginAssemblyId);
+
+        /// <summary>Fails if any SdkMessageProcessingSteps still reference this type.</summary>
+        public Task DeletePluginTypeAsync(string pluginTypeId) => DeleteRecordAsync("plugintypes", pluginTypeId);
+
+        public Task DeleteSdkMessageStepAsync(string stepId) => DeleteRecordAsync("sdkmessageprocessingsteps", stepId);
+
+        public Task DeleteSdkMessageStepImageAsync(string imageId) => DeleteRecordAsync("sdkmessageprocessingstepimages", imageId);
+
+        private async Task DeleteRecordAsync(string entitySetName, string id)
+        {
+            using (await SendAsync(RecordUrl(entitySetName, id), HttpMethod.Delete, null, null).ConfigureAwait(false)) { }
+        }
+
         /// <summary>Returns the solutions (from the same set GetSolutionsAsync returns) that contain the given plugin assembly.</summary>
         public Task<List<DataverseSolution>> GetSolutionsContainingPluginAssemblyAsync(string pluginAssemblyId) =>
             GetSolutionsContainingComponentAsync(pluginAssemblyId, componentType: 91); // Plugin Assembly

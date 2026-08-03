@@ -254,5 +254,90 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
 
             await node.ReloadAsync().ConfigureAwait(true);
         }
+
+        /// <summary>Unregisters a plugin assembly. Fails (surfaced as an error) if any of its types still have registered steps.</summary>
+        public async Task DeleteAssemblyAsync(PluginAssemblyNodeViewModel node)
+        {
+            var confirmed = await _prompts.ConfirmAsync(
+                "D365: Unregister Assembly",
+                $"Unregister '{node.Name}'? This can't be undone, and will fail if any of its plugin types still have registered steps.").ConfigureAwait(true);
+            if (!confirmed) { return; }
+
+            try
+            {
+                await _client.DeletePluginAssemblyAsync(node.Assembly.PluginAssemblyId).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                _prompts.ShowError($"D365: Failed to unregister the assembly: {ex.Message}");
+                return;
+            }
+
+            _allAssemblies.Remove(node);
+            Assemblies.Remove(node);
+            _prompts.ShowInfo($"D365: Unregistered '{node.Name}'.");
+        }
+
+        /// <summary>Unregisters a plugin type. Fails (surfaced as an error) if it still has registered steps.</summary>
+        public async Task DeleteTypeAsync(PluginTypeNodeViewModel node)
+        {
+            var confirmed = await _prompts.ConfirmAsync(
+                "D365: Unregister Plugin Type",
+                $"Unregister '{node.FriendlyName}'? This can't be undone, and will fail if it still has registered steps.").ConfigureAwait(true);
+            if (!confirmed) { return; }
+
+            try
+            {
+                await _client.DeletePluginTypeAsync(node.PluginType.PluginTypeId).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                _prompts.ShowError($"D365: Failed to unregister the plugin type: {ex.Message}");
+                return;
+            }
+
+            if (node.Owner != null) { await node.Owner.ReloadTypesAsync().ConfigureAwait(true); }
+            _prompts.ShowInfo($"D365: Unregistered '{node.FriendlyName}'.");
+        }
+
+        /// <summary>Unregisters a step (and its images, which Dataverse deletes along with it).</summary>
+        public async Task DeleteStepAsync(SdkMessageStepNodeViewModel node)
+        {
+            var confirmed = await _prompts.ConfirmAsync("D365: Unregister Step", $"Unregister step '{node.Name}'? This can't be undone.").ConfigureAwait(true);
+            if (!confirmed) { return; }
+
+            try
+            {
+                await _client.DeleteSdkMessageStepAsync(node.Step.StepId).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                _prompts.ShowError($"D365: Failed to unregister the step: {ex.Message}");
+                return;
+            }
+
+            if (node.Owner != null) { await node.Owner.ReloadStepsAsync().ConfigureAwait(true); }
+            _prompts.ShowInfo($"D365: Unregistered '{node.Name}'.");
+        }
+
+        /// <summary>Unregisters a pre-/post-image.</summary>
+        public async Task DeleteImageAsync(SdkMessageStepImageNodeViewModel node)
+        {
+            var confirmed = await _prompts.ConfirmAsync("D365: Unregister Image", $"Unregister image '{node.Name}'? This can't be undone.").ConfigureAwait(true);
+            if (!confirmed) { return; }
+
+            try
+            {
+                await _client.DeleteSdkMessageStepImageAsync(node.Image.ImageId).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                _prompts.ShowError($"D365: Failed to unregister the image: {ex.Message}");
+                return;
+            }
+
+            if (node.Owner != null) { await node.Owner.ReloadImagesAsync().ConfigureAwait(true); }
+            _prompts.ShowInfo($"D365: Unregistered '{node.Name}'.");
+        }
     }
 }

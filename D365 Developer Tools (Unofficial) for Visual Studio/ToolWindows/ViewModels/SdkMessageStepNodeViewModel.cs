@@ -19,6 +19,8 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         /// <summary>The owning plugin type's friendly name, for the "Edit Step..." dialog header.</summary>
         public string PluginTypeFriendlyName { get; }
 
+        public PluginTypeNodeViewModel Owner { get; set; }
+
         public string Name => Step.Name;
         public string MessageName => Step.MessageName;
         public string PrimaryEntity => Step.PrimaryEntity;
@@ -82,6 +84,13 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             OnPropertyChanged(nameof(Summary));
         }
 
+        /// <summary>Forces a reload of this step's images, e.g. after unregistering one.</summary>
+        public Task ReloadImagesAsync()
+        {
+            _imagesLoaded = false;
+            return LoadImagesAsync();
+        }
+
         private async Task LoadImagesAsync()
         {
             _imagesLoaded = true;
@@ -92,7 +101,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             {
                 var images = await _client.GetSdkMessageStepImagesAsync(Step.StepId).ConfigureAwait(true);
                 Images.Clear();
-                foreach (var image in images) { Images.Add(new SdkMessageStepImageNodeViewModel(image)); }
+                foreach (var image in images) { Images.Add(new SdkMessageStepImageNodeViewModel(image) { Owner = this }); }
             }
             catch (Exception ex)
             {
