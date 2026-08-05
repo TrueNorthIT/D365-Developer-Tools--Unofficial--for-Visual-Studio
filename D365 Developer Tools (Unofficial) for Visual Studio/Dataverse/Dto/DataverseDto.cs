@@ -32,6 +32,13 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse.Dto
         public string SchemaName { get; set; }
         public DataverseLabelDto DisplayName { get; set; }
         public bool IsCustomEntity { get; set; }
+        public string IconVectorName { get; set; }
+    }
+
+    internal sealed class WebResourceContentDto
+    {
+        public string Name { get; set; }
+        public string Content { get; set; }
     }
 
     internal sealed class AttributeDefinitionDto

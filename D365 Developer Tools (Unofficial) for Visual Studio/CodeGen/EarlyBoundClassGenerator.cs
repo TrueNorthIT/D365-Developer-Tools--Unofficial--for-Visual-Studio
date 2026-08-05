@@ -43,7 +43,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.CodeGen
             AttributeDefinition primaryIdAttribute,
             IReadOnlyDictionary<string, string> optionSetEnumNames)
         {
-            var className = NameUtilities.ToPascalCase(entityLogicalName);
+            var className = NameUtilities.ToPascalCase(entityLogicalName, entityDisplayName);
             var sb = new StringBuilder();
 
             sb.Append("// ").Append(entityDisplayName).Append(" (").Append(entityLogicalName).AppendLine(")");
@@ -84,7 +84,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.CodeGen
         private static void AppendProperty(StringBuilder sb, AttributeDefinition attribute, IReadOnlyDictionary<string, string> optionSetEnumNames)
         {
             var kind = AttributeTypeMapper.GetKind(attribute.AttributeType);
-            var propertyName = NameUtilities.ToPascalCase(attribute.LogicalName);
+            var propertyName = NameUtilities.ToPascalCase(attribute.LogicalName, attribute.DisplayName);
 
             var notes = new List<string>();
             if (attribute.IsPrimaryId) { notes.Add("Primary ID"); }

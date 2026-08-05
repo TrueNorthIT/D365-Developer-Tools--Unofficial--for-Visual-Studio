@@ -13,7 +13,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.CodeGen
     internal static class EnumGenerator
     {
         public static string GetEnumName(string attributeLogicalName, string attributeDisplayName) =>
-            NameUtilities.ToPascalCase(string.IsNullOrEmpty(attributeDisplayName) ? attributeLogicalName : attributeDisplayName);
+            NameUtilities.ToPascalCase(attributeLogicalName, attributeDisplayName);
 
         public static string GenerateEnum(string attributeLogicalName, string attributeDisplayName, IReadOnlyList<OptionValue> options)
         {

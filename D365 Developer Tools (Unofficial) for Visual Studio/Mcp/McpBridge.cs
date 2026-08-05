@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Connection;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Persistence;
+using D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared;
 using Microsoft.VisualStudio.Shell;
 using Newtonsoft.Json;
 
@@ -29,12 +30,14 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Mcp
         private static readonly string BridgeFilePath = Path.Combine(JsonFileStore.RootDirectory, "mcp-bridge.json");
 
         private readonly ConnectionManager _connectionManager;
+        private readonly IUserPrompts _prompts;
         private HttpListener _listener;
         private string _nonce;
 
-        public McpBridge(ConnectionManager connectionManager)
+        public McpBridge(ConnectionManager connectionManager, IUserPrompts prompts)
         {
             _connectionManager = connectionManager;
+            _prompts = prompts;
         }
 
         public void Start()
@@ -66,6 +69,10 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Mcp
             ListenLoopAsync(this, listener, _nonce).FileAndForget("D365DeveloperTools/McpBridgeListenLoop");
 
             JsonFileStore.Save(BridgeFilePath, new BridgeState { Port = port, Nonce = _nonce });
+
+            // Best-effort only: IVsStatusbar text is a single shared slot that other VS activity
+            // (including ConnectionManager's own "Connected to..." message) can overwrite immediately.
+            _prompts.ShowInfo("D365: MCP server active.");
         }
 
         public void Stop()
@@ -79,6 +86,8 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Mcp
             listener.Close();
 
             JsonFileStore.Delete(BridgeFilePath);
+
+            _prompts.ShowInfo("D365: MCP server inactive.");
         }
 
         private static async Task ListenLoopAsync(McpBridge bridge, HttpListener listener, string nonce)

@@ -6,10 +6,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.CodeGen;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Connection;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse;
+using D365_Developer_Tools__Unofficial__for_Visual_Studio.Persistence;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Mvvm;
 using Microsoft.VisualStudio.Shell;
@@ -103,7 +105,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
 
             if (IsConnected)
             {
-                RefreshAsync().FileAndForget("D365DeveloperTools/RefreshEntities");
+                LoadEntitiesAsync().FileAndForget("D365DeveloperTools/RefreshEntities");
             }
             else
             {
@@ -114,9 +116,111 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             }
         }
 
-        public async Task RefreshAsync()
+        private async Task LoadEntitiesAsync()
         {
-            IsLoadingEntities = true;
+            var environmentUrl = _connectionManager.Connection?.EnvironmentUrl;
+            var shownFromCache = environmentUrl != null && TryLoadFromCache(environmentUrl);
+
+            // If a cached list is already on screen, refresh silently in the background instead of
+            // flashing the loading spinner over data the user can already see.
+            await RefreshAsync(showLoading: !shownFromCache).ConfigureAwait(true);
+            await ApplyDefaultSolutionAsync().ConfigureAwait(true);
+
+            if (environmentUrl != null && LoadError == null)
+            {
+                JsonFileStore.Save(EntityCachePath(environmentUrl), _allEntities.Select(e => e.Entity).ToList());
+            }
+
+            // Never blocks the list itself — icons pop in progressively once fetched/rendered.
+            LoadIconsAsync().FileAndForget("D365DeveloperTools/LoadEntityIcons");
+        }
+
+        private bool TryLoadFromCache(string environmentUrl)
+        {
+            var cached = JsonFileStore.Load<List<EntityDefinition>>(EntityCachePath(environmentUrl));
+            if (cached == null || cached.Count == 0) { return false; }
+
+            _allEntities = cached.Select(e => new EntityNodeViewModel(e, _client)).ToList();
+            Entities.Clear();
+            foreach (var entity in _allEntities) { Entities.Add(entity); }
+            return true;
+        }
+
+        private static string EntityCachePath(string environmentUrl) =>
+            System.IO.Path.Combine(JsonFileStore.RootDirectory, "entity-cache", JsonFileStore.HashKey(environmentUrl) + ".json");
+
+        /// <summary>
+        /// Fetches (or reuses a disk-cached copy of) each distinct entity icon's SVG, renders it off the
+        /// UI thread, then assigns the result to every matching node. Best-effort throughout — a failed
+        /// fetch or an unrenderable SVG just leaves that entity showing the generic fallback icon.
+        /// </summary>
+        private async Task LoadIconsAsync()
+        {
+            var environmentUrl = _connectionManager.Connection?.EnvironmentUrl;
+            if (environmentUrl == null) { return; }
+
+            var entitiesByIconName = _allEntities
+                .Where(e => e.Entity.IconVectorName != null)
+                .ToLookup(e => e.Entity.IconVectorName);
+            if (entitiesByIconName.Count == 0) { return; }
+
+            var svgByName = JsonFileStore.Load<Dictionary<string, string>>(EntityIconCachePath(environmentUrl))
+                ?? new Dictionary<string, string>();
+
+            var missing = entitiesByIconName.Select(g => g.Key).Where(n => !svgByName.ContainsKey(n)).ToList();
+            if (missing.Count > 0)
+            {
+                Dictionary<string, byte[]> fetched;
+                try
+                {
+                    fetched = await _client.GetIconSvgContentAsync(missing).ConfigureAwait(true);
+                }
+                catch
+                {
+                    fetched = new Dictionary<string, byte[]>();
+                }
+
+                if (fetched.Count > 0)
+                {
+                    foreach (var pair in fetched) { svgByName[pair.Key] = Convert.ToBase64String(pair.Value); }
+                    JsonFileStore.Save(EntityIconCachePath(environmentUrl), svgByName);
+                }
+            }
+
+            var rendered = await Task.Run(() =>
+            {
+                var images = new Dictionary<string, ImageSource>();
+                foreach (var name in entitiesByIconName.Select(g => g.Key))
+                {
+                    if (!svgByName.TryGetValue(name, out var base64)) { continue; }
+
+                    byte[] svgBytes;
+                    try { svgBytes = Convert.FromBase64String(base64); }
+                    catch (FormatException) { continue; }
+
+                    var image = EntityIconRenderer.TryRender(svgBytes);
+                    if (image != null) { images[name] = image; }
+                }
+                return images;
+            }).ConfigureAwait(true);
+
+            foreach (var group in entitiesByIconName)
+            {
+                if (rendered.TryGetValue(group.Key, out var image))
+                {
+                    foreach (var entity in group) { entity.IconSource = image; }
+                }
+            }
+        }
+
+        private static string EntityIconCachePath(string environmentUrl) =>
+            System.IO.Path.Combine(JsonFileStore.RootDirectory, "entity-icons", JsonFileStore.HashKey(environmentUrl) + ".json");
+
+        public Task RefreshAsync() => RefreshAsync(showLoading: true);
+
+        private async Task RefreshAsync(bool showLoading)
+        {
+            if (showLoading) { IsLoadingEntities = true; }
             LoadError = null;
             try
             {
@@ -131,7 +235,28 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             }
             finally
             {
-                IsLoadingEntities = false;
+                if (showLoading) { IsLoadingEntities = false; }
+            }
+        }
+
+        /// <summary>Re-applies the solution filter last picked for this environment (see ShowSolutionPickerAsync), if any.</summary>
+        private async Task ApplyDefaultSolutionAsync()
+        {
+            var environmentUrl = _connectionManager.Connection?.EnvironmentUrl;
+            var defaultSolution = environmentUrl == null ? null : _connectionManager.GetDefaultSolution(environmentUrl);
+            if (defaultSolution == null) { return; }
+
+            try
+            {
+                _solutionFilterIds = await _client.GetSolutionEntityIdsAsync(defaultSolution.SolutionId).ConfigureAwait(true);
+                SolutionFilterName = defaultSolution.FriendlyName;
+                OnPropertyChanged(nameof(HasSolutionFilter));
+                EntitiesView.Refresh();
+            }
+            catch
+            {
+                // The remembered solution may have been deleted/renamed since — leave unfiltered and
+                // let the user re-pick one manually.
             }
         }
 
@@ -179,6 +304,9 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             SolutionFilterName = pick.Value.FriendlyName;
             OnPropertyChanged(nameof(HasSolutionFilter));
             EntitiesView.Refresh();
+
+            var environmentUrl = _connectionManager.Connection?.EnvironmentUrl;
+            if (environmentUrl != null) { _connectionManager.SetDefaultSolution(environmentUrl, pick.Value); }
         }
 
         public void ClearSolutionFilter()
@@ -187,6 +315,9 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             SolutionFilterName = null;
             OnPropertyChanged(nameof(HasSolutionFilter));
             EntitiesView.Refresh();
+
+            var environmentUrl = _connectionManager.Connection?.EnvironmentUrl;
+            if (environmentUrl != null) { _connectionManager.ClearDefaultSolution(environmentUrl); }
         }
 
         // ── Codegen actions (invoked from the tree's context menus) ─────────
@@ -246,7 +377,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
 
             var primaryId = attributes.FirstOrDefault(a => a.IsPrimaryId);
             var fileContent = EarlyBoundClassGenerator.GenerateFile(node.LogicalName, node.DisplayName, selectedAttrs, primaryId, enumNames, enumBlocks);
-            var className = NameUtilities.ToPascalCase(node.LogicalName);
+            var className = NameUtilities.ToPascalCase(node.LogicalName, node.DisplayName);
 
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
             DocumentOpener.OpenAsCSharp(fileContent, $"{className}.cs");

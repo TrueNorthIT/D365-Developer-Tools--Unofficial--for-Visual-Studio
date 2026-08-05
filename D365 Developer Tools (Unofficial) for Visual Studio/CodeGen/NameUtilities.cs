@@ -19,6 +19,10 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.CodeGen
             return LeadingDigit.IsMatch(pascal) ? "_" + pascal : pascal;
         }
 
+        /// <summary>Prefers the friendly display name over the logical name, falling back when the display name is missing.</summary>
+        public static string ToPascalCase(string logicalName, string displayName) =>
+            ToPascalCase(string.IsNullOrEmpty(displayName) ? logicalName : displayName);
+
         public static string ToEnumKey(string label)
         {
             var sanitized = Regex.Replace(label ?? string.Empty, "[^a-zA-Z0-9 _]", " ").Trim();

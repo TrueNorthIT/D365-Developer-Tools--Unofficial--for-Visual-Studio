@@ -22,6 +22,10 @@ internal static class CodeGenerator
         return Regex.IsMatch(pascal, @"^\d") ? "_" + pascal : pascal;
     }
 
+    /// <summary>Prefers the friendly display name over the logical name, falling back when the display name is missing.</summary>
+    public static string ToPascalCase(string logicalName, string displayName) =>
+        ToPascalCase(string.IsNullOrEmpty(displayName) ? logicalName : displayName);
+
     public static string ToEnumKey(string label)
     {
         var sanitized = Regex.Replace(label ?? string.Empty, "[^a-zA-Z0-9 _]", " ").Trim();
@@ -46,11 +50,12 @@ internal static class CodeGenerator
     }
 
     public static string GenerateEnumName(string attributeLogicalName, string attributeDisplayName) =>
-        ToPascalCase(string.IsNullOrEmpty(attributeDisplayName) ? attributeLogicalName : attributeDisplayName);
+        ToPascalCase(attributeLogicalName, attributeDisplayName);
 
     /// <summary>Full, ready-to-paste document: any option-set enums, then the entity class.</summary>
     public static string GenerateClassFile(
         string entityLogicalName,
+        string entityDisplayName,
         IReadOnlyList<AttributeDefinition> selectedAttributes,
         IReadOnlyDictionary<string, string> optionSetEnumNames,
         IEnumerable<string> enumBlocks)
@@ -68,17 +73,18 @@ internal static class CodeGenerator
         }
 
         var primaryIdAttribute = selectedAttributes.FirstOrDefault(a => a.IsPrimaryId);
-        sb.Append(GenerateClass(entityLogicalName, selectedAttributes, primaryIdAttribute, optionSetEnumNames));
+        sb.Append(GenerateClass(entityLogicalName, entityDisplayName, selectedAttributes, primaryIdAttribute, optionSetEnumNames));
         return sb.ToString();
     }
 
     private static string GenerateClass(
         string entityLogicalName,
+        string entityDisplayName,
         IReadOnlyList<AttributeDefinition> selectedAttributes,
         AttributeDefinition? primaryIdAttribute,
         IReadOnlyDictionary<string, string> optionSetEnumNames)
     {
-        var className = ToPascalCase(entityLogicalName);
+        var className = ToPascalCase(entityLogicalName, entityDisplayName);
         var sb = new StringBuilder();
 
         sb.Append("// Requires a reference to Microsoft.Xrm.Sdk (e.g. the Microsoft.CrmSdk.CoreAssemblies NuGet package).").AppendLine();
@@ -117,7 +123,7 @@ internal static class CodeGenerator
 
     private static void AppendProperty(StringBuilder sb, AttributeDefinition attribute, IReadOnlyDictionary<string, string> optionSetEnumNames)
     {
-        var propertyName = ToPascalCase(attribute.LogicalName);
+        var propertyName = ToPascalCase(attribute.LogicalName, attribute.DisplayName);
 
         var notes = new List<string>();
         if (attribute.IsPrimaryId) { notes.Add("Primary ID"); }

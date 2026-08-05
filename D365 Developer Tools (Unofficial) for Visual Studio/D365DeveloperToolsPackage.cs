@@ -105,7 +105,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
                 ConnectionManager = new ConnectionManager(UserPrompts, _solutionContext);
                 DataverseClient = new DataverseClient(ConnectionManager);
 
-                _mcpBridge = new McpBridge(ConnectionManager);
+                _mcpBridge = new McpBridge(ConnectionManager, UserPrompts);
                 ConnectionManager.ConnectionChanged += (_, connection) =>
                 {
                     if (connection != null) { _mcpBridge.Start(); }

@@ -29,8 +29,14 @@ A tool window (**Tools → D365 Developer Tools → D365: Show Entity Explorer**
 Dataverse environment and lets you browse its metadata.
 
 - Lists all entities, searchable by name
-- Filter the list down to a specific solution
+- The list for an environment is cached locally, so re-opening it (or reconnecting) shows the entities
+  instantly while a fresh copy loads silently in the background
+- Filter the list down to a specific solution — your choice is remembered per environment and
+  re-applied automatically the next time you connect to it, until you clear the filter
 - Expand any entity to see its attributes, types, and whether each field is the primary ID or primary name
+- Shows each entity's real Dataverse icon (fetched from its SVG icon web resource and cached locally per
+  environment) once it loads, falling back to a generic table icon for entities without one or if the
+  icon can't be rendered
 - Right-click an entity to generate an early-bound C# class
 - Right-click a Picklist, State, or Status field to generate a standalone enum
 
@@ -215,6 +221,11 @@ opt-in per solution.
 That's it. The extension starts a local token-vending bridge (`%LocalAppData%\D365DeveloperTools\mcp-bridge.json`)
 whenever you're connected; the MCP server reads from it so Claude always has a fresh token without
 storing any credentials.
+
+The extension also posts a brief "D365: MCP server active/inactive" message to Visual Studio's status
+bar whenever the bridge starts or stops. Visual Studio's status bar only has one shared text slot, so
+this message is best-effort — other activity (including the "Connected to..." message) can overwrite it
+immediately.
 
 > If the `d365` server shows as disconnected in `/mcp`, make sure D365 Developer Tools is connected in
 > Visual Studio first.
