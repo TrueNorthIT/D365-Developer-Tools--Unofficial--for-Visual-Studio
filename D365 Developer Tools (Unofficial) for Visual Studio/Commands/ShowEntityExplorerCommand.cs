@@ -17,10 +17,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
         {
         }
 
-        public override CommandConfiguration CommandConfiguration => new("D365: Show Entity Explorer")
-        {
-            Placements = new[] { CommandPlacement.KnownPlacements.ToolsMenu },
-        };
+        public override CommandConfiguration CommandConfiguration => new("Show Entity Explorer");
 
         public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
         {

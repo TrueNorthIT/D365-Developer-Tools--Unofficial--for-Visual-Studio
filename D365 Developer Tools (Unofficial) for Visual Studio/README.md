@@ -11,6 +11,8 @@ VS Code extension, adapted for C#/early-bound Dataverse development instead of T
 - [Features](#features)
   - [Entity Explorer](#entity-explorer)
   - [Plugin Explorer](#plugin-explorer)
+  - [Publish to Dataverse](#publish-to-dataverse)
+  - [Add Step](#add-step)
   - [C# Class Generation](#c-class-generation)
   - [Enum Generation](#enum-generation)
   - [IntelliSense Integration](#intellisense-integration)
@@ -44,8 +46,49 @@ plugin assemblies, similar to the Plugin Registration Tool.
 - Expand a plugin type to see its registered steps — message, target entity, stage, and execution mode,
   with disabled steps shown dimmed
 - Expand a step to see its registered pre-/post-images
+- **Publish project to Dataverse...** — the toolbar button next to the search box builds a project from
+  the open solution and publishes it, the same as right-clicking it in Solution Explorer (see
+  [Publish to Dataverse](#publish-to-dataverse)); the tree refreshes afterward
+- Right-click a plugin type → **Add Step...** to register a new step for it (see [Add Step](#add-step))
+- Right-click a step → **Edit Step...** to change its message, target entity, stage, execution mode,
+  execution order, filtering attributes, or solution — the same dialog as Add Step, pre-filled with the
+  step's current values
 
-This is a read-only browsing tool — it doesn't register, update, or deploy plugins.
+### Publish to Dataverse
+
+Right-click a project in Solution Explorer and choose **D365: Publish to Dataverse...** to build and
+deploy it without leaving Visual Studio.
+
+1. Builds the project (Release configuration).
+2. Looks for an existing Plugin Assembly or Plugin Package in the connected environment with the same
+   name as the built assembly.
+   - **Found** — uploads the new build to it. If it's a traditional plugin assembly, the build is also
+     scanned for `IPlugin` implementations and any newly added ones are registered as Plugin Types
+     (existing ones are left alone, so registered steps are never disturbed).
+   - **Not found (first publish)** — the first time you publish a given project, you'll be asked which
+     deployment model to use:
+     - **Traditional Plugin Assembly** — uploads the .dll to a Plugin Assembly record, then registers a
+       Plugin Type for each `IPlugin` implementation it finds.
+     - **NuGet-style Plugin Package** — uploads to a Plugin Package record; Dataverse derives the
+       plugin types from the package itself.
+
+     Your choice is remembered for that project, and you'll then be asked whether to add the new
+     record to a solution (picked from a list of your Dataverse solutions).
+
+### Add Step
+
+Right-click a `.cs` file that contains a class implementing `IPlugin` and choose **D365: Add
+Step...** to register a new step for it without leaving Visual Studio.
+
+- Looks up the plugin type in the connected environment by its fully-qualified name — the project
+  needs to have been [published](#publish-to-dataverse) first, since a step can't be registered
+  against a type Dataverse doesn't know about yet. If the file has more than one `IPlugin` class, or
+  the type name matches more than one published assembly, you'll be asked which one to use.
+- Opens a dialog to set the message, target entity (only entities valid for the chosen message are
+  offered), stage, execution mode, execution order, and — for `Update` steps — the filtering
+  attributes.
+- **Solution** defaults to the one solution the plugin's assembly belongs to, if it's only in one;
+  otherwise you can pick one from the list, or leave it unset.
 
 ### C# Class Generation
 

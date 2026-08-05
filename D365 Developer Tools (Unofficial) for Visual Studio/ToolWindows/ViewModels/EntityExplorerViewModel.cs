@@ -246,9 +246,10 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
 
             var primaryId = attributes.FirstOrDefault(a => a.IsPrimaryId);
             var fileContent = EarlyBoundClassGenerator.GenerateFile(node.LogicalName, node.DisplayName, selectedAttrs, primaryId, enumNames, enumBlocks);
+            var className = NameUtilities.ToPascalCase(node.LogicalName);
 
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-            DocumentOpener.OpenAsCSharp(fileContent);
+            DocumentOpener.OpenAsCSharp(fileContent, $"{className}.cs");
         }
 
         public async Task GenerateEnumAsync(AttributeNodeViewModel attrNode)
@@ -268,9 +269,10 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             }
 
             var text = "using System;\n\n" + EnumGenerator.GenerateEnum(attrNode.LogicalName, attrNode.DisplayName, options);
+            var enumName = EnumGenerator.GetEnumName(attrNode.LogicalName, attrNode.DisplayName);
 
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-            DocumentOpener.OpenAsCSharp(text);
+            DocumentOpener.OpenAsCSharp(text, $"{enumName}.cs");
         }
     }
 }

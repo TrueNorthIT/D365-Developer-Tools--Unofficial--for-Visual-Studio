@@ -75,4 +75,43 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse.Dto
         public int ImageType { get; set; }
         public string Attributes { get; set; }
     }
+
+    internal sealed class PluginAssemblyLookupDto
+    {
+        public string PluginAssemblyId { get; set; }
+        public string Version { get; set; }
+    }
+
+    internal sealed class PluginPackageLookupDto
+    {
+        public string PluginPackageId { get; set; }
+        public string Version { get; set; }
+    }
+
+    internal sealed class PluginTypeNameDto
+    {
+        public string TypeName { get; set; }
+    }
+
+    internal sealed class PluginAssemblyNameDto
+    {
+        public string PluginAssemblyId { get; set; }
+        public string Name { get; set; }
+    }
+
+    internal sealed class PluginTypeMatchDto
+    {
+        public string PluginTypeId { get; set; }
+        public string TypeName { get; set; }
+        public string FriendlyName { get; set; }
+
+        [JsonProperty("_pluginassemblyid_value")]
+        public string PluginAssemblyIdValue { get; set; }
+    }
+
+    internal sealed class SolutionComponentSolutionDto
+    {
+        [JsonProperty("_solutionid_value")]
+        public string SolutionIdValue { get; set; }
+    }
 }

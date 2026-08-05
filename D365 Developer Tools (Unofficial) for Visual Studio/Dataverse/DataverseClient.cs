@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Connection;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse.Dto;
@@ -186,14 +188,25 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                 .ToList();
         }
 
-        public async Task<List<SdkMessageStepDefinition>> GetSdkMessageStepsAsync(string pluginTypeId)
-        {
-            var url = ApiUrl(
-                "sdkmessageprocessingsteps",
-                "$select=sdkmessageprocessingstepid,name,stage,mode,rank,statecode,filteringattributes,_sdkmessageid_value,_sdkmessagefilterid_value",
-                $"$filter=_plugintypeid_value eq '{pluginTypeId}'",
-                "$orderby=stage,rank");
+        public Task<List<SdkMessageStepDefinition>> GetSdkMessageStepsAsync(string pluginTypeId) =>
+            GetSdkMessageStepsByFilterAsync($"_plugintypeid_value eq '{pluginTypeId}'", "$orderby=stage,rank");
 
+        public async Task<SdkMessageStepDefinition> GetSdkMessageStepAsync(string stepId)
+        {
+            var steps = await GetSdkMessageStepsByFilterAsync($"sdkmessageprocessingstepid eq '{stepId}'").ConfigureAwait(false);
+            return steps.FirstOrDefault();
+        }
+
+        private async Task<List<SdkMessageStepDefinition>> GetSdkMessageStepsByFilterAsync(string filter, string orderBy = null)
+        {
+            var queryParts = new List<string>
+            {
+                "$select=sdkmessageprocessingstepid,name,stage,mode,rank,statecode,filteringattributes,_sdkmessageid_value,_sdkmessagefilterid_value",
+                $"$filter={filter}",
+            };
+            if (orderBy != null) { queryParts.Add(orderBy); }
+
+            var url = ApiUrl("sdkmessageprocessingsteps", queryParts.ToArray());
             var raw = await FetchPagedAsync<SdkMessageStepDto>(url).ConfigureAwait(false);
 
             var messageIds = raw.Where(s => s.SdkMessageIdValue != null).Select(s => s.SdkMessageIdValue).Distinct().ToList();
@@ -211,9 +224,13 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                 {
                     StepId = s.SdkMessageProcessingStepId,
                     Name = s.Name,
+                    SdkMessageId = s.SdkMessageIdValue,
                     MessageName = s.SdkMessageIdValue != null && messageNames.TryGetValue(s.SdkMessageIdValue, out var messageName) ? messageName : null,
+                    SdkMessageFilterId = s.SdkMessageFilterIdValue,
                     PrimaryEntity = s.SdkMessageFilterIdValue != null && filterEntities.TryGetValue(s.SdkMessageFilterIdValue, out var entity) ? entity : null,
+                    StageValue = s.Stage,
                     Stage = PluginOptionLabels.Stage(s.Stage),
+                    ModeValue = s.Mode,
                     Mode = PluginOptionLabels.Mode(s.Mode),
                     Rank = s.Rank,
                     IsEnabled = s.StateCode == 0,
@@ -261,6 +278,220 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                 .ToList();
         }
 
+        // ── Publishing plugin assemblies / packages ─────────────────────────────
+
+        public async Task<PluginRecordRef> FindPluginAssemblyByNameAsync(string name)
+        {
+            var url = ApiUrl("pluginassemblies", "$select=pluginassemblyid,version", $"$filter=name eq '{EscapeODataLiteral(name)}'");
+            var raw = await FetchPagedAsync<PluginAssemblyLookupDto>(url).ConfigureAwait(false);
+            var match = raw.FirstOrDefault();
+            return match == null ? null : new PluginRecordRef { Id = match.PluginAssemblyId, Version = match.Version };
+        }
+
+        public async Task<PluginRecordRef> FindPluginPackageByNameAsync(string name)
+        {
+            var url = ApiUrl("pluginpackages", "$select=pluginpackageid,version", $"$filter=name eq '{EscapeODataLiteral(name)}'");
+            var raw = await FetchPagedAsync<PluginPackageLookupDto>(url).ConfigureAwait(false);
+            var match = raw.FirstOrDefault();
+            return match == null ? null : new PluginRecordRef { Id = match.PluginPackageId, Version = match.Version };
+        }
+
+        /// <summary>Creates a new PluginAssembly record. Isolation mode defaults to Sandbox, matching Dataverse's own default for new registrations.</summary>
+        public Task<string> CreatePluginAssemblyAsync(string name, string contentBase64, string version, string solutionUniqueName) =>
+            CreateRecordAsync("pluginassemblies", new
+            {
+                name,
+                content = contentBase64,
+                version,
+                isolationmode = 2, // Sandbox
+                sourcetype = 0, // Database
+            }, solutionUniqueName);
+
+        public Task UpdatePluginAssemblyContentAsync(string pluginAssemblyId, string contentBase64, string version) =>
+            UpdateRecordAsync("pluginassemblies", pluginAssemblyId, new { content = contentBase64, version });
+
+        public Task<string> CreatePluginPackageAsync(string name, string contentBase64, string version, string solutionUniqueName) =>
+            CreateRecordAsync("pluginpackages", new
+            {
+                name,
+                content = contentBase64,
+                version,
+            }, solutionUniqueName);
+
+        public Task UpdatePluginPackageContentAsync(string pluginPackageId, string contentBase64, string version) =>
+            UpdateRecordAsync("pluginpackages", pluginPackageId, new { content = contentBase64, version });
+
+        public async Task<HashSet<string>> GetExistingPluginTypeNamesAsync(string pluginAssemblyId)
+        {
+            var url = ApiUrl("plugintypes", "$select=typename", $"$filter=_pluginassemblyid_value eq '{pluginAssemblyId}'");
+            var raw = await FetchPagedAsync<PluginTypeNameDto>(url).ConfigureAwait(false);
+            return new HashSet<string>(raw.Select(t => t.TypeName), StringComparer.OrdinalIgnoreCase);
+        }
+
+        public Task<string> CreatePluginTypeAsync(string pluginAssemblyId, string typeName, string friendlyName, string solutionUniqueName) =>
+            CreateRecordAsync("plugintypes", new Dictionary<string, object>
+            {
+                ["typename"] = typeName,
+                ["friendlyname"] = friendlyName,
+                ["name"] = typeName,
+                ["pluginassemblyid@odata.bind"] = $"/pluginassemblies({pluginAssemblyId})",
+            }, solutionUniqueName);
+
+        /// <summary>Finds PluginType records matching a fully-qualified type name — may return more than one if the same type name exists in more than one assembly.</summary>
+        public async Task<List<PluginTypeMatch>> FindPluginTypesByTypeNameAsync(string typeName)
+        {
+            var url = ApiUrl(
+                "plugintypes",
+                "$select=plugintypeid,typename,friendlyname,_pluginassemblyid_value",
+                $"$filter=typename eq '{EscapeODataLiteral(typeName)}'");
+
+            var raw = await FetchPagedAsync<PluginTypeMatchDto>(url).ConfigureAwait(false);
+            if (raw.Count == 0) { return new List<PluginTypeMatch>(); }
+
+            var assemblyIds = raw.Select(t => t.PluginAssemblyIdValue).Distinct().ToList();
+            var filter = string.Join(" or ", assemblyIds.Select(id => $"pluginassemblyid eq '{id}'"));
+            var assemblyUrl = ApiUrl("pluginassemblies", "$select=pluginassemblyid,name", $"$filter={filter}");
+            var assemblies = (await FetchPagedAsync<PluginAssemblyNameDto>(assemblyUrl).ConfigureAwait(false))
+                .ToDictionary(a => a.PluginAssemblyId, a => a.Name);
+
+            return raw
+                .Select(t => new PluginTypeMatch
+                {
+                    PluginTypeId = t.PluginTypeId,
+                    PluginAssemblyId = t.PluginAssemblyIdValue,
+                    TypeName = t.TypeName,
+                    FriendlyName = t.FriendlyName,
+                    AssemblyName = assemblies.TryGetValue(t.PluginAssemblyIdValue, out var name) ? name : t.PluginAssemblyIdValue,
+                })
+                .ToList();
+        }
+
+        /// <summary>Returns the solutions (from the same set GetSolutionsAsync returns) that contain the given plugin assembly.</summary>
+        public Task<List<DataverseSolution>> GetSolutionsContainingPluginAssemblyAsync(string pluginAssemblyId) =>
+            GetSolutionsContainingComponentAsync(pluginAssemblyId, componentType: 91); // Plugin Assembly
+
+        /// <summary>Returns the solutions (from the same set GetSolutionsAsync returns) that contain the given SDK message processing step.</summary>
+        public Task<List<DataverseSolution>> GetSolutionsContainingStepAsync(string stepId) =>
+            GetSolutionsContainingComponentAsync(stepId, componentType: 92); // SDK Message Processing Step
+
+        private async Task<List<DataverseSolution>> GetSolutionsContainingComponentAsync(string objectId, int componentType)
+        {
+            var url = ApiUrl(
+                "solutioncomponents",
+                "$select=_solutionid_value",
+                $"$filter=objectid eq '{objectId}' and componenttype eq {componentType}");
+
+            var raw = await FetchPagedAsync<SolutionComponentSolutionDto>(url).ConfigureAwait(false);
+            var solutionIds = new HashSet<string>(raw.Select(c => c.SolutionIdValue));
+            if (solutionIds.Count == 0) { return new List<DataverseSolution>(); }
+
+            var allSolutions = await GetSolutionsAsync().ConfigureAwait(false);
+            return allSolutions.Where(s => solutionIds.Contains(s.SolutionId)).ToList();
+        }
+
+        public async Task<List<SdkMessageOption>> GetSdkMessagesAsync()
+        {
+            var url = ApiUrl("sdkmessages", "$select=sdkmessageid,name", "$orderby=name");
+            var raw = await FetchPagedAsync<SdkMessageDto>(url).ConfigureAwait(false);
+            return raw.Select(m => new SdkMessageOption { SdkMessageId = m.SdkMessageId, Name = m.Name }).ToList();
+        }
+
+        /// <summary>The entities a given message can be filtered to. Empty if the message supports registering without an entity filter.</summary>
+        public async Task<List<SdkMessageFilterOption>> GetSdkMessageFiltersAsync(string sdkMessageId)
+        {
+            var url = ApiUrl(
+                "sdkmessagefilters",
+                "$select=sdkmessagefilterid,primaryobjecttypecode",
+                $"$filter=_sdkmessageid_value eq '{sdkMessageId}'",
+                "$orderby=primaryobjecttypecode");
+
+            var raw = await FetchPagedAsync<SdkMessageFilterDto>(url).ConfigureAwait(false);
+            return raw
+                .Where(f => !string.IsNullOrEmpty(f.PrimaryObjectTypeCode))
+                .Select(f => new SdkMessageFilterOption { SdkMessageFilterId = f.SdkMessageFilterId, EntityLogicalName = f.PrimaryObjectTypeCode })
+                .ToList();
+        }
+
+        public Task<string> CreateSdkMessageStepAsync(
+            string pluginTypeId,
+            string sdkMessageId,
+            string sdkMessageFilterId,
+            string name,
+            int stage,
+            int mode,
+            int rank,
+            string filteringAttributes,
+            string solutionUniqueName)
+        {
+            var body = new Dictionary<string, object>
+            {
+                ["name"] = name,
+                ["stage"] = stage,
+                ["mode"] = mode,
+                ["rank"] = rank,
+                ["plugintypeid@odata.bind"] = $"/plugintypes({pluginTypeId})",
+                ["sdkmessageid@odata.bind"] = $"/sdkmessages({sdkMessageId})",
+            };
+
+            if (!string.IsNullOrEmpty(sdkMessageFilterId))
+            {
+                body["sdkmessagefilterid@odata.bind"] = $"/sdkmessagefilters({sdkMessageFilterId})";
+            }
+
+            if (!string.IsNullOrEmpty(filteringAttributes))
+            {
+                body["filteringattributes"] = filteringAttributes;
+            }
+
+            return CreateRecordAsync("sdkmessageprocessingsteps", body, solutionUniqueName);
+        }
+
+        /// <summary>
+        /// Updates an existing SDK message processing step. Message/entity/stage/mode/rank/filtering
+        /// attributes are all editable, matching the Plugin Registration Tool's own "Update Step" dialog.
+        /// Clearing the entity filter (switching back to "all entities") needs a separate $ref delete —
+        /// Web API PATCH can't null out a single-valued navigation property by binding it to nothing.
+        /// </summary>
+        public async Task UpdateSdkMessageStepAsync(
+            string stepId,
+            string sdkMessageId,
+            string sdkMessageFilterId,
+            string name,
+            int stage,
+            int mode,
+            int rank,
+            string filteringAttributes,
+            string solutionUniqueName)
+        {
+            var body = new Dictionary<string, object>
+            {
+                ["name"] = name,
+                ["stage"] = stage,
+                ["mode"] = mode,
+                ["rank"] = rank,
+                ["filteringattributes"] = filteringAttributes,
+                ["sdkmessageid@odata.bind"] = $"/sdkmessages({sdkMessageId})",
+            };
+
+            if (!string.IsNullOrEmpty(sdkMessageFilterId))
+            {
+                body["sdkmessagefilterid@odata.bind"] = $"/sdkmessagefilters({sdkMessageFilterId})";
+            }
+
+            await UpdateRecordAsync("sdkmessageprocessingsteps", stepId, body, solutionUniqueName).ConfigureAwait(false);
+
+            if (string.IsNullOrEmpty(sdkMessageFilterId))
+            {
+                await ClearSdkMessageStepFilterAsync(stepId).ConfigureAwait(false);
+            }
+        }
+
+        private async Task ClearSdkMessageStepFilterAsync(string stepId)
+        {
+            var url = $"{RecordUrl("sdkmessageprocessingsteps", stepId)}/sdkmessagefilterid/$ref";
+            using (await SendAsync(url, HttpMethod.Delete, null, null, HttpStatusCode.NotFound).ConfigureAwait(false)) { }
+        }
+
         // ── Internals ────────────────────────────────────────────────────────
 
         private string ApiUrl(string resource, params string[] queryParts)
@@ -269,6 +500,8 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
             var query = queryParts.Length > 0 ? "?" + string.Join("&", queryParts) : string.Empty;
             return $"{baseUrl}/api/data/v9.2/{resource}{query}";
         }
+
+        private string RecordUrl(string entitySetName, string id) => $"{ApiUrl(entitySetName)}({id})";
 
         private async Task<List<T>> FetchPagedAsync<T>(string initialUrl)
         {
@@ -287,31 +520,80 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
 
         private async Task<T> RequestAsync<T>(string url, HttpMethod method = null, object body = null)
         {
-            var token = await _connectionManager.GetAccessTokenAsync().ConfigureAwait(false);
-
-            using (var request = new HttpRequestMessage(method ?? HttpMethod.Get, url))
+            using (var response = await SendAsync(url, method ?? HttpMethod.Get, body, null).ConfigureAwait(false))
             {
-                request.Headers.Add("Authorization", $"Bearer {token}");
-                request.Headers.Add("OData-MaxVersion", "4.0");
-                request.Headers.Add("OData-Version", "4.0");
-                request.Headers.Add("Accept", "application/json");
-
-                if (body != null)
-                {
-                    request.Content = new StringContent(JsonConvert.SerializeObject(body), System.Text.Encoding.UTF8, "application/json");
-                }
-
-                using (var response = await Http.SendAsync(request).ConfigureAwait(false))
-                {
-                    var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        throw new InvalidOperationException($"Dataverse API error {(int)response.StatusCode}: {(string.IsNullOrEmpty(text) ? response.ReasonPhrase : text)}");
-                    }
-
-                    return string.IsNullOrEmpty(text) ? default : JsonConvert.DeserializeObject<T>(text);
-                }
+                var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                return string.IsNullOrEmpty(text) ? default : JsonConvert.DeserializeObject<T>(text);
             }
         }
+
+        /// <summary>Creates a record and returns its new ID, parsed from the OData-EntityId response header (Dataverse returns 204 No Content on create).</summary>
+        private async Task<string> CreateRecordAsync(string entitySetName, object body, string solutionUniqueName)
+        {
+            var headers = string.IsNullOrEmpty(solutionUniqueName)
+                ? null
+                : new Dictionary<string, string> { ["MSCRM.SolutionUniqueName"] = solutionUniqueName };
+
+            using (var response = await SendAsync(ApiUrl(entitySetName), HttpMethod.Post, body, headers).ConfigureAwait(false))
+            {
+                if (!response.Headers.TryGetValues("OData-EntityId", out var values))
+                {
+                    throw new InvalidOperationException("Dataverse did not return an OData-EntityId header for the created record.");
+                }
+
+                var match = Regex.Match(values.First(), @"\(([0-9a-fA-F-]{36})\)");
+                if (!match.Success)
+                {
+                    throw new InvalidOperationException($"Could not parse the created record's ID from: {values.First()}");
+                }
+
+                return match.Groups[1].Value;
+            }
+        }
+
+        private async Task UpdateRecordAsync(string entitySetName, string id, object body, string solutionUniqueName = null)
+        {
+            var headers = string.IsNullOrEmpty(solutionUniqueName)
+                ? null
+                : new Dictionary<string, string> { ["MSCRM.SolutionUniqueName"] = solutionUniqueName };
+
+            using (await SendAsync(RecordUrl(entitySetName, id), new HttpMethod("PATCH"), body, headers).ConfigureAwait(false))
+            {
+                // Dataverse returns 204 No Content on a successful update; nothing further to read.
+            }
+        }
+
+        private async Task<HttpResponseMessage> SendAsync(string url, HttpMethod method, object body, IDictionary<string, string> extraHeaders, HttpStatusCode? alsoAcceptable = null)
+        {
+            var token = await _connectionManager.GetAccessTokenAsync().ConfigureAwait(false);
+
+            var request = new HttpRequestMessage(method, url);
+            request.Headers.Add("Authorization", $"Bearer {token}");
+            request.Headers.Add("OData-MaxVersion", "4.0");
+            request.Headers.Add("OData-Version", "4.0");
+            request.Headers.Add("Accept", "application/json");
+
+            if (extraHeaders != null)
+            {
+                foreach (var header in extraHeaders) { request.Headers.Add(header.Key, header.Value); }
+            }
+
+            if (body != null)
+            {
+                request.Content = new StringContent(JsonConvert.SerializeObject(body), System.Text.Encoding.UTF8, "application/json");
+            }
+
+            var response = await Http.SendAsync(request).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode && response.StatusCode != alsoAcceptable)
+            {
+                var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                response.Dispose();
+                throw new InvalidOperationException($"Dataverse API error {(int)response.StatusCode}: {(string.IsNullOrEmpty(text) ? response.ReasonPhrase : text)}");
+            }
+
+            return response;
+        }
+
+        private static string EscapeODataLiteral(string value) => value?.Replace("'", "''");
     }
 }

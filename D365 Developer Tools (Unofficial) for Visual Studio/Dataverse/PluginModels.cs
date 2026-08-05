@@ -28,12 +28,16 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
     {
         public string StepId { get; set; }
         public string Name { get; set; }
+        public string SdkMessageId { get; set; }
         public string MessageName { get; set; }
 
         /// <summary>Null for steps registered against every entity (no message filter).</summary>
+        public string SdkMessageFilterId { get; set; }
         public string PrimaryEntity { get; set; }
 
+        public int StageValue { get; set; }
         public string Stage { get; set; }
+        public int ModeValue { get; set; }
         public string Mode { get; set; }
         public int Rank { get; set; }
         public bool IsEnabled { get; set; }
@@ -47,6 +51,35 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         public string EntityAlias { get; set; }
         public string ImageType { get; set; }
         public string Attributes { get; set; }
+    }
+
+    /// <summary>Identifies an existing PluginAssembly or PluginPackage record found by name.</summary>
+    internal sealed class PluginRecordRef
+    {
+        public string Id { get; set; }
+        public string Version { get; set; }
+    }
+
+    internal sealed class SdkMessageOption
+    {
+        public string SdkMessageId { get; set; }
+        public string Name { get; set; }
+    }
+
+    internal sealed class SdkMessageFilterOption
+    {
+        public string SdkMessageFilterId { get; set; }
+        public string EntityLogicalName { get; set; }
+    }
+
+    /// <summary>A PluginType record found by its fully-qualified type name — possibly ambiguous if more than one assembly registers a type with that name.</summary>
+    internal sealed class PluginTypeMatch
+    {
+        public string PluginTypeId { get; set; }
+        public string PluginAssemblyId { get; set; }
+        public string TypeName { get; set; }
+        public string FriendlyName { get; set; }
+        public string AssemblyName { get; set; }
     }
 
     /// <summary>Maps the raw numeric option-set values Dataverse returns for plugin metadata to their labels.</summary>
@@ -94,5 +127,31 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         public static string Stage(int value) => Stages.TryGetValue(value, out var label) ? label : value.ToString();
         public static string Mode(int value) => Modes.TryGetValue(value, out var label) ? label : value.ToString();
         public static string ImageType(int value) => ImageTypes.TryGetValue(value, out var label) ? label : value.ToString();
+
+        /// <summary>The three stages a step can actually be registered against (the rest are internal-only/deprecated).</summary>
+        public static readonly IReadOnlyList<PluginOption> RegisterableStages = new List<PluginOption>
+        {
+            new PluginOption(10, "Pre-validation"),
+            new PluginOption(20, "Pre-operation"),
+            new PluginOption(40, "Post-operation"),
+        };
+
+        public static readonly IReadOnlyList<PluginOption> RegisterableModes = new List<PluginOption>
+        {
+            new PluginOption(0, "Synchronous"),
+            new PluginOption(1, "Asynchronous"),
+        };
+    }
+
+    internal sealed class PluginOption
+    {
+        public int Value { get; }
+        public string Label { get; }
+
+        public PluginOption(int value, string label)
+        {
+            Value = value;
+            Label = label;
+        }
     }
 }

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <Extern href="stdidcmd.h" />
+  <Extern href="vsshlids.h" />
+
+  <Commands package="guidD365DeveloperToolsPackage">
+    <Groups>
+      <Group guid="guidD365ProjectContextMenuCmdSet" id="ProjectContextMenuGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_PROJNODE" />
+      </Group>
+      <Group guid="guidD365ProjectContextMenuCmdSet" id="ItemContextMenuGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_ITEMNODE" />
+      </Group>
+    </Groups>
+
+    <Buttons>
+      <Button guid="guidD365ProjectContextMenuCmdSet" id="cmdidPublishToDataverse" priority="0x0100" type="Button">
+        <Parent guid="guidD365ProjectContextMenuCmdSet" id="ProjectContextMenuGroup" />
+        <Strings>
+          <ButtonText>D365: Publish to Dataverse...</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidD365ProjectContextMenuCmdSet" id="cmdidChangeDeploymentModel" priority="0x0101" type="Button">
+        <Parent guid="guidD365ProjectContextMenuCmdSet" id="ProjectContextMenuGroup" />
+        <Strings>
+          <ButtonText>D365: Change Deployment Model...</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidD365ProjectContextMenuCmdSet" id="cmdidAddStepToPlugin" priority="0x0100" type="Button">
+        <Parent guid="guidD365ProjectContextMenuCmdSet" id="ItemContextMenuGroup" />
+        <Strings>
+          <ButtonText>D365: Add Step...</ButtonText>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+
+  <Symbols>
+    <GuidSymbol name="guidD365DeveloperToolsPackage" value="{8f2b6c4e-1a3d-4e6f-9b2a-1c4d5e6f7a8b}" />
+
+    <GuidSymbol name="guidD365ProjectContextMenuCmdSet" value="{5f7a8b9c-1d2e-4f3a-b4c5-d6e7f8a9b0c1}">
+      <IDSymbol name="ProjectContextMenuGroup" value="0x1020" />
+      <IDSymbol name="cmdidPublishToDataverse" value="0x0100" />
+      <IDSymbol name="ItemContextMenuGroup" value="0x1021" />
+      <IDSymbol name="cmdidAddStepToPlugin" value="0x0101" />
+      <IDSymbol name="cmdidChangeDeploymentModel" value="0x0102" />
+    </GuidSymbol>
+  </Symbols>
+</CommandTable>

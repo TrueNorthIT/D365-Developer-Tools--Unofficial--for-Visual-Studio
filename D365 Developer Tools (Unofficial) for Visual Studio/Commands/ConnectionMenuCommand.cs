@@ -22,10 +22,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
         {
         }
 
-        public override CommandConfiguration CommandConfiguration => new("D365: Connect / Manage Connection…")
-        {
-            Placements = new[] { CommandPlacement.KnownPlacements.ToolsMenu },
-        };
+        public override CommandConfiguration CommandConfiguration => new("Connect / Manage Connection…");
 
         public override async Task ExecuteCommandAsync(IClientContext context, CancellationToken cancellationToken)
         {

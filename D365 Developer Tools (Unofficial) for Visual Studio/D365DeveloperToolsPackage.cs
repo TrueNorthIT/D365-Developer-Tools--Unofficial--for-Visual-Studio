@@ -1,4 +1,6 @@
 using System;
+using System.ComponentModel.Design;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,6 +30,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
     [Guid(PackageGuids.D365DeveloperToolsPackageString)]
     [ProvideToolWindow(typeof(EntityExplorerToolWindow), Style = VsDockStyle.Tabbed, Window = ToolWindowGuids80.SolutionExplorer)]
     [ProvideToolWindow(typeof(PluginExplorerToolWindow), Style = VsDockStyle.Tabbed, Window = ToolWindowGuids80.SolutionExplorer)]
+    [ProvideMenuResource("Menus.ctmenu", 1)]
     [ProvideAutoLoad(UIContextGuids80.NoSolution, PackageAutoLoadFlags.BackgroundLoad)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.SolutionExists_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class D365DeveloperToolsPackage : AsyncPackage
@@ -112,6 +115,20 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
                 // Covers the case where the package finishes loading after a solution is already open.
                 ConnectionManager.TryRestoreConnectionAsync().FileAndForget("D365DeveloperTools/RestoreConnectionOnActivate");
 
+                if (await GetServiceAsync(typeof(IMenuCommandService)).ConfigureAwait(true) is OleMenuCommandService commandService)
+                {
+                    var publishCommandId = new CommandID(PackageGuids.ProjectContextMenuCmdSet, PkgCmdIDList.cmdidPublishToDataverse);
+                    commandService.AddCommand(new OleMenuCommand(OnPublishToDataverse, publishCommandId));
+
+                    var changeDeploymentModelCommandId = new CommandID(PackageGuids.ProjectContextMenuCmdSet, PkgCmdIDList.cmdidChangeDeploymentModel);
+                    commandService.AddCommand(new OleMenuCommand(OnChangeDeploymentModel, changeDeploymentModelCommandId));
+
+                    var addStepCommandId = new CommandID(PackageGuids.ProjectContextMenuCmdSet, PkgCmdIDList.cmdidAddStepToPlugin);
+                    var addStepCommand = new OleMenuCommand(OnAddStepToPlugin, addStepCommandId);
+                    addStepCommand.BeforeQueryStatus += OnAddStepToPluginBeforeQueryStatus;
+                    commandService.AddCommand(addStepCommand);
+                }
+
                 ActivityLog.LogInformation("D365DeveloperTools", "InitializeAsync: completed successfully");
                 _initialized.TrySetResult(true);
             }
@@ -121,6 +138,13 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
                 _initialized.TrySetException(ex);
                 throw;
             }
+        }
+
+        /// <summary>Public wrapper around the protected Package.GetService, for ViewModels that need EnvDTE (e.g. Plugin Explorer's "Publish project..." button).</summary>
+        internal EnvDTE.DTE GetDte()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            return GetService(typeof(EnvDTE.DTE)) as EnvDTE.DTE;
         }
 
         /// <summary>Public wrapper around the protected AsyncPackage.ShowToolWindowAsync, for the Extensibility-model commands.</summary>
@@ -141,6 +165,97 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
             {
                 throw new NotSupportedException("Cannot create the D365 Plugin Explorer tool window.");
             }
+        }
+
+        /// <summary>Handles the "D365: Publish to Dataverse..." Solution Explorer project context menu command.</summary>
+        private void OnPublishToDataverse(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            if (!(GetService(typeof(EnvDTE.DTE)) is EnvDTE.DTE dte)) { return; }
+
+            var selectedItems = dte.SelectedItems;
+            if (selectedItems == null || selectedItems.Count == 0) { return; }
+
+            var project = selectedItems.Item(1).Project;
+            if (project == null) { return; }
+
+            Commands.PublishToDataverseCommand.ExecuteAsync(dte, project)
+                .FileAndForget("D365DeveloperTools/PublishToDataverse");
+        }
+
+        /// <summary>Handles the "D365: Change Deployment Model..." Solution Explorer project context menu command.</summary>
+        private void OnChangeDeploymentModel(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            if (!(GetService(typeof(EnvDTE.DTE)) is EnvDTE.DTE dte)) { return; }
+
+            var selectedItems = dte.SelectedItems;
+            if (selectedItems == null || selectedItems.Count == 0) { return; }
+
+            var project = selectedItems.Item(1).Project;
+            if (project == null) { return; }
+
+            Commands.ChangeDeploymentModelCommand.ExecuteAsync(dte, project)
+                .FileAndForget("D365DeveloperTools/ChangeDeploymentModel");
+        }
+
+        /// <summary>Only shows "D365: Add Step..." for a single selected .cs file whose text looks like it declares an IPlugin implementation.</summary>
+        private void OnAddStepToPluginBeforeQueryStatus(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            var command = (OleMenuCommand)sender;
+            command.Visible = false;
+            command.Enabled = false;
+
+            var filePath = TryGetSelectedCSharpFilePath();
+            if (filePath == null) { return; }
+
+            if (!PluginPublishing.PluginTypeNameExtractor.FileMightContainPlugin(filePath)) { return; }
+
+            command.Visible = true;
+            command.Enabled = true;
+        }
+
+        /// <summary>Handles the "D365: Add Step..." .cs file context menu command.</summary>
+        private void OnAddStepToPlugin(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            var filePath = TryGetSelectedCSharpFilePath();
+            if (filePath == null) { return; }
+
+            Commands.AddStepToPluginCommand.ExecuteAsync(filePath)
+                .FileAndForget("D365DeveloperTools/AddStepToPlugin");
+        }
+
+        private string TryGetSelectedCSharpFilePath()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            if (!(GetService(typeof(EnvDTE.DTE)) is EnvDTE.DTE dte)) { return null; }
+
+            var selectedItems = dte.SelectedItems;
+            if (selectedItems == null || selectedItems.Count != 1) { return null; }
+
+            var projectItem = selectedItems.Item(1).ProjectItem;
+            if (projectItem == null || projectItem.FileCount == 0) { return null; }
+
+            string filePath;
+            try
+            {
+                filePath = projectItem.FileNames[1];
+            }
+            catch
+            {
+                return null;
+            }
+
+            return !string.IsNullOrEmpty(filePath) && string.Equals(Path.GetExtension(filePath), ".cs", StringComparison.OrdinalIgnoreCase)
+                ? filePath
+                : null;
         }
 
         protected override void Dispose(bool disposing)
