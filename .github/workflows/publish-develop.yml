@@ -1,0 +1,19 @@
+name: Publish (develop)
+
+# Runs on every merge to develop. Publishes to the real Visual Studio
+# Marketplace with the run number appended as the manifest's 4th version
+# quad - see _publish-vsix.yml for why there's no true "pre-release" channel
+# for VS extensions.
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch: {}
+
+jobs:
+  publish:
+    uses: ./.github/workflows/_publish-vsix.yml
+    with:
+      bump_run_number: true
+    secrets:
+      VS_MARKETPLACE_PAT: ${{ secrets.VS_MARKETPLACE_PAT }}

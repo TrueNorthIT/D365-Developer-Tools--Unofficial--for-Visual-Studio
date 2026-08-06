@@ -1,0 +1,149 @@
+name: Publish VSIX (reusable)
+
+# Shared build+publish logic for both the develop and main publish workflows.
+# Called via `workflow_call` - never runs on its own.
+#
+# Note: there is no "pre-release" concept in the real Visual Studio Marketplace
+# (unlike the VS Code marketplace) - VsixPublisher.exe just publishes a version.
+# The only difference between the develop and main flows is versioning:
+#   - develop builds auto-append the GitHub Actions run number as the manifest's
+#     4th version quad, so every develop merge publishes a unique, ever-increasing
+#     build without anyone having to touch the manifest by hand.
+#   - main builds publish whatever Major.Minor.Patch is already checked into
+#     source.extension.vsixmanifest (bump that by hand in the PR before merging).
+
+on:
+  workflow_call:
+    inputs:
+      bump_run_number:
+        description: >
+          Append the GitHub Actions run number as the manifest's 4th version
+          quad before building. Used for develop builds; main releases publish
+          the version already checked into source.extension.vsixmanifest.
+        type: boolean
+        default: false
+    secrets:
+      VS_MARKETPLACE_PAT:
+        required: true
+
+env:
+  PROJECT_DIR: D365 Developer Tools (Unofficial) for Visual Studio
+  PROJECT_NAME: D365 Developer Tools (Unofficial) for Visual Studio
+
+concurrency:
+  group: publish-vsix-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: D:\r
+    steps:
+      - name: Checkout (short path)
+        # actions/checkout's default location (D:\a\<repo>\<repo>\...) doubles
+        # this repo's already-long name. Combined with this project's long
+        # directory/file names, some build output paths (e.g. the MCP server's
+        # published runtimeconfig.json under obj\McpServerPublish\) exceed
+        # Windows' 260-char MAX_PATH, which breaks VSSDK's zip packaging step
+        # with VSSDK1025 "Could not find a part of the path". Clone to a short
+        # absolute path instead.
+        shell: pwsh
+        working-directory: .
+        run: |
+          git init "D:\r"
+          git -C "D:\r" remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git -C "D:\r" fetch --depth 1 origin ${{ github.sha }}
+          git -C "D:\r" checkout FETCH_HEAD
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Bump manifest version with run number
+        if: ${{ inputs.bump_run_number }}
+        shell: pwsh
+        run: |
+          $manifestPath = Join-Path $env:PROJECT_DIR "source.extension.vsixmanifest"
+          [xml]$manifest = Get-Content -Path $manifestPath
+          $ns = New-Object System.Xml.XmlNamespaceManager($manifest.NameTable)
+          $ns.AddNamespace("v", "http://schemas.microsoft.com/developer/vsx-schema/2011")
+          $identity = $manifest.SelectSingleNode("//v:Identity", $ns)
+
+          $parts = $identity.Version.Split(".")
+          if ($parts.Length -lt 3) { throw "Expected Major.Minor.Patch in manifest Version, got '$($identity.Version)'" }
+          $parts = $parts[0..2]
+          $newVersion = ($parts -join ".") + "." + $env:GITHUB_RUN_NUMBER
+
+          $identity.Version = $newVersion
+          $manifest.Save($manifestPath)
+          Write-Host "Manifest version set to $newVersion"
+
+      - name: Restore & build (Release)
+        shell: pwsh
+        run: |
+          msbuild "$env:PROJECT_DIR\$env:PROJECT_NAME.csproj" `
+            /restore `
+            /p:Configuration=Release `
+            /p:DeployExtension=false `
+            /verbosity:minimal
+
+      - name: Locate built VSIX
+        id: vsix
+        shell: pwsh
+        run: |
+          $vsix = Get-ChildItem -Path $env:PROJECT_DIR -Recurse -Filter *.vsix | Select-Object -First 1
+          if (-not $vsix) { throw "No .vsix file found under $env:PROJECT_DIR" }
+          Write-Host "Found VSIX: $($vsix.FullName)"
+
+          # The Marketplace rejects payload file names containing spaces/parentheses
+          # (VsixPub0036), which the built file name has since it's derived from the
+          # project's AssemblyName. Copy it to a sanitized name for upload only -
+          # this doesn't affect the installed extension's identity, which comes from
+          # source.extension.vsixmanifest, not the uploaded file's name.
+          $sanitizedPath = Join-Path $vsix.DirectoryName "D365DeveloperToolsUnofficialForVisualStudio.vsix"
+          Copy-Item -Path $vsix.FullName -Destination $sanitizedPath -Force
+          Write-Host "Copied to sanitized payload name: $sanitizedPath"
+          "path=$sanitizedPath" >> $env:GITHUB_OUTPUT
+
+      - name: Locate VsixPublisher.exe
+        id: publisher
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsInstallPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Workload.VisualStudioExtension -property installationPath
+          if (-not $vsInstallPath) { throw "No Visual Studio install with the 'Visual Studio extension development' workload was found on this runner" }
+
+          $exe = Join-Path $vsInstallPath "VSSDK\VisualStudioIntegration\Tools\Bin\VsixPublisher.exe"
+          if (-not (Test-Path $exe)) { throw "VsixPublisher.exe not found at expected path: $exe" }
+          "path=$exe" >> $env:GITHUB_OUTPUT
+
+      - name: Publish to Visual Studio Marketplace
+        shell: pwsh
+        env:
+          VS_MARKETPLACE_PAT: ${{ secrets.VS_MARKETPLACE_PAT }}
+        run: |
+          # VsixPublisher.exe on current VS2022 builds has a known bug: it throws an
+          # unhandled exception in its telemetry code AFTER a successful upload and
+          # always returns a non-zero exit code regardless of outcome.
+          # See https://github.com/microsoft/VSExtensibility/issues/70 and /issues/300.
+          # Work around it by checking the output for that specific benign crash
+          # signature before treating a non-zero exit code as a real failure.
+          $output = & "${{ steps.publisher.outputs.path }}" publish `
+            -payload "${{ steps.vsix.outputs.path }}" `
+            -publishManifest "$env:PROJECT_DIR\vs-publish.json" `
+            -personalAccessToken $env:VS_MARKETPLACE_PAT 2>&1 | Out-String
+          $exitCode = $LASTEXITCODE
+          Write-Host $output
+
+          if ($exitCode -ne 0) {
+            $isKnownBenignTelemetryCrash = ($output -match "RemoteControlClient") -or ($output -match "TelemetryLogger") -or ($output -match "System\.Memory")
+            if ($isKnownBenignTelemetryCrash) {
+              Write-Warning "VsixPublisher.exe exited with code $exitCode, but the output matches the known benign post-publish telemetry crash rather than a real publish failure. Treating as success."
+            } else {
+              throw "VsixPublisher.exe failed with exit code $exitCode"
+            }
+          }

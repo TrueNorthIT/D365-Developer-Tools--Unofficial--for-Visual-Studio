@@ -1,0 +1,105 @@
+<vsp:DialogWindow x:Class="D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs.StepEditorDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:conv="clr-namespace:D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Converters"
+        xmlns:controls="clr-namespace:D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Controls"
+        xmlns:vsp="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
+        x:ClassModifier="internal"
+        Title="{Binding DialogTitle}" Height="620" Width="480"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="{DynamicResource {x:Static vsp:EnvironmentColors.ToolWindowBackgroundBrushKey}}"
+        Foreground="{DynamicResource {x:Static vsp:EnvironmentColors.ToolWindowTextBrushKey}}">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Styles/ThemedControls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+        <conv:BoolToVisibilityConverter x:Key="BoolToVisibleConverter" />
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="120" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,10" FontWeight="Bold"
+                   Text="{Binding PluginTypeFriendlyName}" TextTrimming="CharacterEllipsis" />
+
+        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Step name" />
+        <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4" Padding="3" Text="{Binding StepName, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Message" />
+        <controls:FilterableComboBox Grid.Row="2" Grid.Column="1" Margin="0,4"
+                  ItemsSource="{Binding Messages}" DisplayMemberPath="Name" SelectedItem="{Binding SelectedMessage}" />
+
+        <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="Primary entity" />
+        <controls:FilterableComboBox Grid.Row="3" Grid.Column="1" Margin="0,4"
+                  ItemsSource="{Binding Entities}" DisplayMemberPath="EntityLogicalName" SelectedItem="{Binding SelectedEntity}" />
+
+        <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Stage" />
+        <controls:FilterableComboBox Grid.Row="4" Grid.Column="1" Margin="0,4"
+                  ItemsSource="{Binding Stages}" DisplayMemberPath="Label" SelectedItem="{Binding SelectedStage}" />
+
+        <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Text="Execution mode" />
+        <controls:FilterableComboBox Grid.Row="5" Grid.Column="1" Margin="0,4"
+                  ItemsSource="{Binding Modes}" DisplayMemberPath="Label" SelectedItem="{Binding SelectedMode}" />
+
+        <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="Execution order" />
+        <TextBox Grid.Row="6" Grid.Column="1" Margin="0,4" Padding="3" Width="60" HorizontalAlignment="Left" Text="{Binding Rank, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Grid.Row="7" Grid.Column="0" VerticalAlignment="Center" Text="Filtering attributes"
+                   Visibility="{Binding IsUpdateMessage, Converter={StaticResource BoolToVisibleConverter}}" />
+        <Button Grid.Row="7" Grid.Column="1" Margin="0,4" HorizontalAlignment="Left" Padding="8,3"
+                Content="{Binding FilteringAttributesSummary}" Command="{Binding ChooseFilteringAttributesCommand}"
+                Visibility="{Binding IsUpdateMessage, Converter={StaticResource BoolToVisibleConverter}}" />
+
+        <TextBlock Grid.Row="8" Grid.Column="0" VerticalAlignment="Center" Text="Solution" />
+        <controls:FilterableComboBox Grid.Row="8" Grid.Column="1" Margin="0,4"
+                  ItemsSource="{Binding Solutions}" DisplayMemberPath="FriendlyName" SelectedItem="{Binding SelectedSolution}" />
+
+        <TextBlock Grid.Row="9" Grid.Column="0" VerticalAlignment="Center" Text="Run in user's context" />
+        <controls:FilterableComboBox Grid.Row="9" Grid.Column="1" Margin="0,4"
+                  ItemsSource="{Binding ImpersonationUsers}" DisplayMemberPath="FullName" SelectedItem="{Binding SelectedImpersonationUser}" />
+
+        <TextBlock Grid.Row="10" Grid.Column="0" VerticalAlignment="Center" Text="Description" />
+        <TextBox Grid.Row="10" Grid.Column="1" Margin="0,4" Padding="3" Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Grid.Row="11" Grid.Column="0" VerticalAlignment="Center" Text="Unsecure config" />
+        <TextBox Grid.Row="11" Grid.Column="1" Margin="0,4" Padding="3" Text="{Binding UnsecureConfiguration, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Grid.Row="12" Grid.Column="0" VerticalAlignment="Top" Margin="0,4,0,0" Text="Secure config" />
+        <StackPanel Grid.Row="12" Grid.Column="1">
+            <TextBox Margin="0,4" Padding="3" Text="{Binding SecureConfiguration, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Text="Leave blank to keep the existing value unchanged — Dataverse never returns it for display."
+                       Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibleConverter}}"
+                       TextWrapping="Wrap" FontSize="10" Opacity="0.7" Margin="0,0,0,4" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="14" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="{Binding OkButtonLabel}" Width="80" IsDefault="True" Click="OnOk" Margin="0,0,8,0" />
+            <Button Content="Cancel" Width="80" IsCancel="True" />
+        </StackPanel>
+    </Grid>
+</vsp:DialogWindow>
