@@ -28,7 +28,9 @@ VS Code extension, adapted for C#/early-bound Dataverse development instead of T
 A tool window (**Tools → D365 Developer Tools → D365: Show Entity Explorer**) that connects to your
 Dataverse environment and lets you browse its metadata.
 
-- Lists all entities, searchable by name
+- Lists all entities, searchable by name — results are ranked by relevance (exact and prefix matches
+  first), not left in alphabetical order, so typing "account" surfaces the **Account** table before
+  other entities that merely contain "account" somewhere in their name
 - The list for an environment is cached locally, so re-opening it (or reconnecting) shows the entities
   instantly while a fresh copy loads silently in the background
 - Filter the list down to a specific solution — your choice is remembered per environment and
@@ -45,8 +47,9 @@ Dataverse environment and lets you browse its metadata.
 A tool window (**Tools → D365 Developer Tools → D365: Show Plugin Explorer**) for browsing registered
 plugin assemblies, similar to the Plugin Registration Tool.
 
-- Lists all plugin assemblies, searchable by name, with their version, isolation mode, and — for
-  assemblies deployed as part of a NuGet-style plugin package — the package name
+- Lists all plugin assemblies, searchable by name (ranked by relevance, same as Entity Explorer's
+  search), with their version, isolation mode, and — for assemblies deployed as part of a NuGet-style
+  plugin package — the package name
 - Filter the list down to a specific solution
 - Expand an assembly to see its plugin types (and whether each is a workflow activity)
 - Expand a plugin type to see its registered steps — message, target entity, stage, and execution mode,

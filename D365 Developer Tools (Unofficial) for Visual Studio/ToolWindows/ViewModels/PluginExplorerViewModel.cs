@@ -34,7 +34,19 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         public string SearchText
         {
             get => _searchText;
-            set { if (SetProperty(ref _searchText, value)) { AssembliesView.Refresh(); } }
+            set
+            {
+                if (SetProperty(ref _searchText, value))
+                {
+                    if (AssembliesView is ListCollectionView listView)
+                    {
+                        var query = value?.Trim() ?? string.Empty;
+                        listView.CustomSort = string.IsNullOrEmpty(query) ? null : new AssemblyRelevanceComparer(query);
+                    }
+
+                    AssembliesView.Refresh();
+                }
+            }
         }
 
         private string _solutionFilterName;
@@ -174,6 +186,16 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             if (string.IsNullOrWhiteSpace(SearchText)) { return true; }
 
             return node.SearchText.Contains(SearchText.Trim().ToLowerInvariant());
+        }
+
+        /// <summary>Ranks assemblies by name match relevance — see EntityExplorerViewModel.EntityRelevanceComparer for why this matters.</summary>
+        private sealed class AssemblyRelevanceComparer : System.Collections.IComparer
+        {
+            private readonly string _query;
+            public AssemblyRelevanceComparer(string query) => _query = query;
+
+            public int Compare(object x, object y) =>
+                SearchRelevance.Rank(((PluginAssemblyNodeViewModel)x).Name, _query).CompareTo(SearchRelevance.Rank(((PluginAssemblyNodeViewModel)y).Name, _query));
         }
 
         private async Task ShowSolutionPickerAsync()

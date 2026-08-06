@@ -48,7 +48,32 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs
             return ((PickRowViewModel)obj).SearchText.Contains(text);
         }
 
-        private void OnSearchTextChanged(object sender, TextChangedEventArgs e) => _view.Refresh();
+        private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_view is ListCollectionView listView)
+            {
+                var query = SearchBox.Text?.Trim() ?? string.Empty;
+                listView.CustomSort = string.IsNullOrEmpty(query) ? null : new RelevanceComparer(query);
+            }
+
+            _view.Refresh();
+        }
+
+        /// <summary>Ranks rows by their best match across Label/Description/Detail, so a match in the primary label always outranks a match found only in the (less prominent) detail text.</summary>
+        private sealed class RelevanceComparer : System.Collections.IComparer
+        {
+            private readonly string _query;
+            public RelevanceComparer(string query) => _query = query;
+
+            public int Compare(object x, object y) => RankOf((PickRowViewModel)x).CompareTo(RankOf((PickRowViewModel)y));
+
+            private int RankOf(PickRowViewModel row) => new[]
+            {
+                SearchRelevance.Rank(row.Label, _query),
+                SearchRelevance.Rank(row.Description, _query),
+                SearchRelevance.Rank(row.Detail, _query),
+            }.Min();
+        }
 
         private void OnRowClicked(object sender, MouseButtonEventArgs e)
         {
