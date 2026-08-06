@@ -35,6 +35,16 @@
     <None Include="README.md" />
   </ItemGroup>
 
+  <!-- Referenced by source.extension.vsixmanifest's <Icon> element; must be packaged
+       into the VSIX at the same relative path for the Marketplace/Extensions dialog
+       to find it. -->
+  <ItemGroup>
+    <Content Include="Resources\Icon.png">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
   <!-- ProjectTemplates\CSharp\D365Plugin\ is raw .vstemplate content (with $safeprojectname$ tokens),
        not real source of this extension - exclude its .cs file from compilation. -->
   <ItemGroup>
