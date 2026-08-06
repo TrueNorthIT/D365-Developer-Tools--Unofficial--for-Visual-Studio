@@ -7,11 +7,7 @@ name: Publish (develop)
 
 on:
   push:
-    # TODO(jc): remove "feature/jc/publish-vsix-workflows" before merging - it's
-    # here only so this workflow can be end-to-end tested (real Marketplace
-    # publish) from the feature branch itself, since workflow_dispatch won't
-    # show up in the Actions UI until this file lands on the default branch.
-    branches: [develop, feature/jc/publish-vsix-workflows]
+    branches: [develop]
   workflow_dispatch: {}
 
 jobs:
