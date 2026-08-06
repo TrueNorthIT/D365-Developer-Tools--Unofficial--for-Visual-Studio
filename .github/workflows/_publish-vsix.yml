@@ -40,9 +40,25 @@ permissions:
 jobs:
   publish:
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: D:\r
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout (short path)
+        # actions/checkout's default location (D:\a\<repo>\<repo>\...) doubles
+        # this repo's already-long name. Combined with this project's long
+        # directory/file names, some build output paths (e.g. the MCP server's
+        # published runtimeconfig.json under obj\McpServerPublish\) exceed
+        # Windows' 260-char MAX_PATH, which breaks VSSDK's zip packaging step
+        # with VSSDK1025 "Could not find a part of the path". Clone to a short
+        # absolute path instead.
+        shell: pwsh
+        working-directory: .
+        run: |
+          git init "D:\r"
+          git -C "D:\r" remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git -C "D:\r" fetch --depth 1 origin ${{ github.sha }}
+          git -C "D:\r" checkout FETCH_HEAD
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
