@@ -238,5 +238,140 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             var succeeded = await EditStepCommand.ExecuteAsync(_client, _prompts, node.Step, node.PluginTypeFriendlyName).ConfigureAwait(true);
             if (succeeded) { await node.ReloadAsync().ConfigureAwait(true); }
         }
+
+        /// <summary>Activates or deactivates a step in place, mirroring the Plugin Registration Tool's Enable/Disable commands.</summary>
+        public async Task SetStepEnabledAsync(SdkMessageStepNodeViewModel node, bool enabled)
+        {
+            try
+            {
+                await _client.SetSdkMessageStepEnabledAsync(node.Step.StepId, enabled).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                _prompts.ShowError($"D365: Failed to {(enabled ? "enable" : "disable")} the step: {ex.Message}");
+                return;
+            }
+
+            await node.ReloadAsync().ConfigureAwait(true);
+        }
+
+        /// <summary>Unregisters a plugin assembly. Fails (surfaced as an error) if any of its types still have registered steps.</summary>
+        public async Task DeleteAssemblyAsync(PluginAssemblyNodeViewModel node)
+        {
+            var confirmed = await _prompts.ConfirmAsync(
+                "D365: Unregister Assembly",
+                $"Unregister '{node.Name}'? This can't be undone, and will fail if any of its plugin types still have registered steps.").ConfigureAwait(true);
+            if (!confirmed) { return; }
+
+            try
+            {
+                await _client.DeletePluginAssemblyAsync(node.Assembly.PluginAssemblyId).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                _prompts.ShowError($"D365: Failed to unregister the assembly: {ex.Message}");
+                return;
+            }
+
+            _allAssemblies.Remove(node);
+            Assemblies.Remove(node);
+            _prompts.ShowInfo($"D365: Unregistered '{node.Name}'.");
+        }
+
+        /// <summary>Unregisters a plugin type. Fails (surfaced as an error) if it still has registered steps.</summary>
+        public async Task DeleteTypeAsync(PluginTypeNodeViewModel node)
+        {
+            var confirmed = await _prompts.ConfirmAsync(
+                "D365: Unregister Plugin Type",
+                $"Unregister '{node.FriendlyName}'? This can't be undone, and will fail if it still has registered steps.").ConfigureAwait(true);
+            if (!confirmed) { return; }
+
+            try
+            {
+                await _client.DeletePluginTypeAsync(node.PluginType.PluginTypeId).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                _prompts.ShowError($"D365: Failed to unregister the plugin type: {ex.Message}");
+                return;
+            }
+
+            if (node.Owner != null) { await node.Owner.ReloadTypesAsync().ConfigureAwait(true); }
+            _prompts.ShowInfo($"D365: Unregistered '{node.FriendlyName}'.");
+        }
+
+        /// <summary>Unregisters a step (and its images, which Dataverse deletes along with it).</summary>
+        public async Task DeleteStepAsync(SdkMessageStepNodeViewModel node)
+        {
+            var confirmed = await _prompts.ConfirmAsync("D365: Unregister Step", $"Unregister step '{node.Name}'? This can't be undone.").ConfigureAwait(true);
+            if (!confirmed) { return; }
+
+            try
+            {
+                await _client.DeleteSdkMessageStepAsync(node.Step.StepId).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                _prompts.ShowError($"D365: Failed to unregister the step: {ex.Message}");
+                return;
+            }
+
+            if (node.Owner != null) { await node.Owner.ReloadStepsAsync().ConfigureAwait(true); }
+            _prompts.ShowInfo($"D365: Unregistered '{node.Name}'.");
+        }
+
+        /// <summary>Unregisters a pre-/post-image.</summary>
+        public async Task DeleteImageAsync(SdkMessageStepImageNodeViewModel node)
+        {
+            var confirmed = await _prompts.ConfirmAsync("D365: Unregister Image", $"Unregister image '{node.Name}'? This can't be undone.").ConfigureAwait(true);
+            if (!confirmed) { return; }
+
+            try
+            {
+                await _client.DeleteSdkMessageStepImageAsync(node.Image.ImageId).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                _prompts.ShowError($"D365: Failed to unregister the image: {ex.Message}");
+                return;
+            }
+
+            if (node.Owner != null) { await node.Owner.ReloadImagesAsync().ConfigureAwait(true); }
+            _prompts.ShowInfo($"D365: Unregistered '{node.Name}'.");
+        }
+
+        /// <summary>Edits an assembly's Description — the only field the Plugin Registration Tool itself allows editing after registration.</summary>
+        public async Task EditAssemblyDescriptionAsync(PluginAssemblyNodeViewModel node)
+        {
+            var newDescription = await _prompts.PromptTextAsync(
+                $"D365: Edit Description — {node.Name}", "Description", defaultValue: node.Description ?? string.Empty).ConfigureAwait(true);
+            if (newDescription == null) { return; }
+
+            try
+            {
+                await _client.UpdatePluginAssemblyDescriptionAsync(node.Assembly.PluginAssemblyId, newDescription).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                _prompts.ShowError($"D365: Failed to update the description: {ex.Message}");
+                return;
+            }
+
+            node.UpdateDescription(newDescription);
+        }
+
+        /// <summary>Registers a new pre-/post-image on a step found in this tree.</summary>
+        public async Task AddImageAsync(SdkMessageStepNodeViewModel node)
+        {
+            var succeeded = await ImageEditorCommand.AddAsync(_client, _prompts, node.Step.StepId, node.Step.PrimaryEntity).ConfigureAwait(true);
+            if (succeeded) { await node.ReloadImagesAsync().ConfigureAwait(true); }
+        }
+
+        /// <summary>Edits an already-registered image found in this tree.</summary>
+        public async Task EditImageAsync(SdkMessageStepImageNodeViewModel node)
+        {
+            var succeeded = await ImageEditorCommand.EditAsync(_client, _prompts, node.Image, node.Owner?.Step.PrimaryEntity).ConfigureAwait(true);
+            if (succeeded && node.Owner != null) { await node.Owner.ReloadImagesAsync().ConfigureAwait(true); }
+        }
     }
 }

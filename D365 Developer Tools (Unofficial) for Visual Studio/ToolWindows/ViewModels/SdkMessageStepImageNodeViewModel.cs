@@ -6,6 +6,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
     internal sealed class SdkMessageStepImageNodeViewModel
     {
         public SdkMessageStepImageDefinition Image { get; }
+        public SdkMessageStepNodeViewModel Owner { get; set; }
 
         public string Name => Image.Name;
         public string EntityAlias => Image.EntityAlias;

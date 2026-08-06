@@ -31,6 +31,78 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows
             }
         }
 
+        private void OnEnableStepClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<SdkMessageStepNodeViewModel>(sender, out var node))
+            {
+                ViewModel.SetStepEnabledAsync(node, enabled: true).FileAndForget("D365DeveloperTools/PluginExplorerEnableStep");
+            }
+        }
+
+        private void OnDisableStepClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<SdkMessageStepNodeViewModel>(sender, out var node))
+            {
+                ViewModel.SetStepEnabledAsync(node, enabled: false).FileAndForget("D365DeveloperTools/PluginExplorerDisableStep");
+            }
+        }
+
+        private void OnAddImageClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<SdkMessageStepNodeViewModel>(sender, out var node))
+            {
+                ViewModel.AddImageAsync(node).FileAndForget("D365DeveloperTools/PluginExplorerAddImage");
+            }
+        }
+
+        private void OnEditImageClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<SdkMessageStepImageNodeViewModel>(sender, out var node))
+            {
+                ViewModel.EditImageAsync(node).FileAndForget("D365DeveloperTools/PluginExplorerEditImage");
+            }
+        }
+
+        private void OnEditAssemblyDescriptionClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<PluginAssemblyNodeViewModel>(sender, out var node))
+            {
+                ViewModel.EditAssemblyDescriptionAsync(node).FileAndForget("D365DeveloperTools/PluginExplorerEditAssemblyDescription");
+            }
+        }
+
+        private void OnUnregisterAssemblyClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<PluginAssemblyNodeViewModel>(sender, out var node))
+            {
+                ViewModel.DeleteAssemblyAsync(node).FileAndForget("D365DeveloperTools/PluginExplorerUnregisterAssembly");
+            }
+        }
+
+        private void OnUnregisterTypeClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<PluginTypeNodeViewModel>(sender, out var node))
+            {
+                ViewModel.DeleteTypeAsync(node).FileAndForget("D365DeveloperTools/PluginExplorerUnregisterType");
+            }
+        }
+
+        private void OnUnregisterStepClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<SdkMessageStepNodeViewModel>(sender, out var node))
+            {
+                ViewModel.DeleteStepAsync(node).FileAndForget("D365DeveloperTools/PluginExplorerUnregisterStep");
+            }
+        }
+
+        private void OnUnregisterImageClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<SdkMessageStepImageNodeViewModel>(sender, out var node))
+            {
+                ViewModel.DeleteImageAsync(node).FileAndForget("D365DeveloperTools/PluginExplorerUnregisterImage");
+            }
+        }
+
         private static bool TryGetRowDataContext<T>(object sender, out T value) where T : class
         {
             value = null;

@@ -84,7 +84,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
             await prompts.RunWithProgressAsync($"D365: Publishing '{assemblyName}'…", async () =>
             {
                 await client.UpdatePluginAssemblyContentAsync(existing.Id, contentBase64, version).ConfigureAwait(true);
-                await RegisterNewPluginTypesAsync(client, existing.Id, assemblyPath, solutionUniqueName: null).ConfigureAwait(true);
+                await RegisterNewPluginTypesAsync(client, existing.Id, assemblyPath, solutionUniqueName: null, assemblyName, version).ConfigureAwait(true);
             }).ConfigureAwait(true);
 
             prompts.ShowInfo($"D365: Published '{assemblyName}' (updated existing plugin assembly).");
@@ -120,7 +120,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
                 await prompts.RunWithProgressAsync($"D365: Publishing '{assemblyName}'…", async () =>
                 {
                     newAssemblyId = await client.CreatePluginAssemblyAsync(assemblyName, contentBase64, version, solutionUniqueName).ConfigureAwait(true);
-                    await RegisterNewPluginTypesAsync(client, newAssemblyId, assemblyPath, solutionUniqueName).ConfigureAwait(true);
+                    await RegisterNewPluginTypesAsync(client, newAssemblyId, assemblyPath, solutionUniqueName, assemblyName, version).ConfigureAwait(true);
                 }).ConfigureAwait(true);
 
                 prompts.ShowInfo($"D365: Published '{assemblyName}' as a new plugin assembly.");
@@ -135,18 +135,24 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
             }
         }
 
-        /// <summary>Scans the built assembly for IPlugin types and registers any not already present in Dataverse. Never removes existing plugin types.</summary>
-        private static async Task RegisterNewPluginTypesAsync(DataverseClient client, string pluginAssemblyId, string assemblyPath, string solutionUniqueName)
+        /// <summary>Scans the built assembly for IPlugin and custom-workflow-activity (CodeActivity) types and registers any not already present in Dataverse. Never removes existing plugin types.</summary>
+        private static async Task RegisterNewPluginTypesAsync(DataverseClient client, string pluginAssemblyId, string assemblyPath, string solutionUniqueName, string assemblyName, string version)
         {
             var discovered = PluginTypeScanner.FindPluginTypes(assemblyPath);
             if (discovered.Count == 0) { return; }
 
             var existingTypeNames = await client.GetExistingPluginTypeNamesAsync(pluginAssemblyId).ConfigureAwait(true);
 
+            // Matches the Plugin Registration Tool's own default WorkflowActivityGroupName so newly
+            // registered activities show up grouped sensibly in the classic process designer.
+            var workflowActivityGroupName = $"{assemblyName} ({version})";
+
             foreach (var type in discovered)
             {
                 if (existingTypeNames.Contains(type.TypeName)) { continue; }
-                await client.CreatePluginTypeAsync(pluginAssemblyId, type.TypeName, type.FriendlyName, solutionUniqueName).ConfigureAwait(true);
+                await client.CreatePluginTypeAsync(
+                    pluginAssemblyId, type.TypeName, type.FriendlyName, solutionUniqueName,
+                    type.IsWorkflowActivity ? workflowActivityGroupName : null).ConfigureAwait(true);
             }
         }
 

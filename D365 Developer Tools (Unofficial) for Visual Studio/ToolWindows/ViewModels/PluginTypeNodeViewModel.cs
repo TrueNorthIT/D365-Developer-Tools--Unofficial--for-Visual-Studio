@@ -18,6 +18,8 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         /// <summary>The owning assembly's ID — needed to default the "Add Step" dialog's solution picker.</summary>
         public string PluginAssemblyId { get; }
 
+        public PluginAssemblyNodeViewModel Owner { get; set; }
+
         public string Name => PluginType.TypeName;
         public string FriendlyName => PluginType.FriendlyName;
         public bool IsWorkflowActivity => PluginType.IsWorkflowActivity;
@@ -72,7 +74,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             {
                 var steps = await _client.GetSdkMessageStepsAsync(PluginType.PluginTypeId).ConfigureAwait(true);
                 Steps.Clear();
-                foreach (var step in steps) { Steps.Add(new SdkMessageStepNodeViewModel(step, _client, FriendlyName)); }
+                foreach (var step in steps) { Steps.Add(new SdkMessageStepNodeViewModel(step, _client, FriendlyName) { Owner = this }); }
             }
             catch (Exception ex)
             {

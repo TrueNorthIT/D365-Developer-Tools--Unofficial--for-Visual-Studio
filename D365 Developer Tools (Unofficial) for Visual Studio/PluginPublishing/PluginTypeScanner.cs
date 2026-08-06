@@ -11,6 +11,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.PluginPublishing
     {
         public string TypeName { get; set; }
         public string FriendlyName { get; set; }
+        public bool IsWorkflowActivity { get; set; }
     }
 
     /// <summary>
@@ -22,6 +23,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.PluginPublishing
     internal static class PluginTypeScanner
     {
         private const string PluginInterfaceFullName = "Microsoft.Xrm.Sdk.IPlugin";
+        private const string WorkflowActivityBaseTypeFullName = "System.Activities.CodeActivity";
 
         public static List<DiscoveredPluginType> FindPluginTypes(string assemblyPath)
         {
@@ -55,23 +57,35 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.PluginPublishing
                     if (!type.IsPublic || type.IsAbstract || type.IsInterface) { continue; }
 
                     bool implementsIPlugin;
+                    bool isWorkflowActivity;
                     try
                     {
                         implementsIPlugin = type.GetInterfaces().Any(i => i.FullName == PluginInterfaceFullName);
+                        isWorkflowActivity = !implementsIPlugin && DerivesFromCodeActivity(type);
                     }
                     catch
                     {
                         continue; // type's base chain couldn't be fully resolved; skip rather than fail the whole scan
                     }
 
-                    if (implementsIPlugin)
+                    if (implementsIPlugin || isWorkflowActivity)
                     {
-                        result.Add(new DiscoveredPluginType { TypeName = type.FullName, FriendlyName = type.Name });
+                        result.Add(new DiscoveredPluginType { TypeName = type.FullName, FriendlyName = type.Name, IsWorkflowActivity = isWorkflowActivity });
                     }
                 }
 
                 return result;
             }
+        }
+
+        /// <summary>Walks the base-type chain by name (not by direct Type comparison — MetadataLoadContext types aren't the "real" System.Activities.CodeActivity, just structurally identical ones from a different load context).</summary>
+        private static bool DerivesFromCodeActivity(Type type)
+        {
+            for (var current = type.BaseType; current != null; current = current.BaseType)
+            {
+                if (current.FullName == WorkflowActivityBaseTypeFullName) { return true; }
+            }
+            return false;
         }
     }
 }

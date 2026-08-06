@@ -46,6 +46,13 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs
             });
         }
 
+        public async Task<bool> ConfirmAsync(string title, string message)
+        {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+            var result = DialogForegroundHelper.ShowMessage(message, title, System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning);
+            return result == System.Windows.MessageBoxResult.Yes;
+        }
+
         public void ShowError(string message)
         {
             // Plain WPF MessageBox, not VsShellUtilities.ShowMessageBox — that requires a VS service

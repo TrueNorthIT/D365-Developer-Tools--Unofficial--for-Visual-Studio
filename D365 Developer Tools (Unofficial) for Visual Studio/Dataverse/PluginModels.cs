@@ -13,6 +13,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         /// <summary>Null when the assembly wasn't deployed as part of a NuGet-style plugin package.</summary>
         public string PackageName { get; set; }
         public string PackageVersion { get; set; }
+        public string Description { get; set; }
     }
 
     internal sealed class PluginTypeDefinition
@@ -42,6 +43,46 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         public int Rank { get; set; }
         public bool IsEnabled { get; set; }
         public string FilteringAttributes { get; set; }
+        public string Description { get; set; }
+        public string UnsecureConfiguration { get; set; }
+
+        /// <summary>Null when the step runs as the calling user (the default) rather than an impersonated one.</summary>
+        public string ImpersonatingUserId { get; set; }
+
+        /// <summary>Null when the step has no secure configuration record yet. Dataverse never returns the secure value itself, only whether one exists.</summary>
+        public string SecureConfigId { get; set; }
+    }
+
+    internal sealed class SystemUserOption
+    {
+        public string UserId { get; set; }
+        public string FullName { get; set; }
+    }
+
+    /// <summary>Everything needed to create or update an SdkMessageProcessingStep — grouped here rather than as a long positional parameter list.</summary>
+    internal sealed class StepRegistrationDetails
+    {
+        public string SdkMessageId { get; set; }
+
+        /// <summary>Null for "(all entities)".</summary>
+        public string SdkMessageFilterId { get; set; }
+        public string Name { get; set; }
+        public int Stage { get; set; }
+        public int Mode { get; set; }
+        public int Rank { get; set; }
+        public string FilteringAttributes { get; set; }
+        public string SolutionUniqueName { get; set; }
+        public string Description { get; set; }
+        public string UnsecureConfiguration { get; set; }
+
+        /// <summary>Null to run as the calling user (the default).</summary>
+        public string ImpersonatingUserId { get; set; }
+
+        /// <summary>Null/empty means "leave the secure configuration as-is" on update (Dataverse never returns its value, so a blank field isn't a request to clear it).</summary>
+        public string SecureConfiguration { get; set; }
+
+        /// <summary>Update only: the step's current secure-config record ID, if it already has one.</summary>
+        public string ExistingSecureConfigId { get; set; }
     }
 
     internal sealed class SdkMessageStepImageDefinition
@@ -49,8 +90,23 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         public string ImageId { get; set; }
         public string Name { get; set; }
         public string EntityAlias { get; set; }
+        public int ImageTypeValue { get; set; }
         public string ImageType { get; set; }
         public string Attributes { get; set; }
+    }
+
+    /// <summary>Everything needed to create or update an SdkMessageProcessingStepImage.</summary>
+    internal sealed class ImageRegistrationDetails
+    {
+        public string Name { get; set; }
+        public string EntityAlias { get; set; }
+        public int ImageType { get; set; }
+
+        /// <summary>Comma-separated attribute logical names.</summary>
+        public string Attributes { get; set; }
+
+        /// <summary>The Request message's target parameter name. "Target" covers every message images are realistically used with (Create/Update/Delete/Assign) — see the Message/Request Class Property table in Microsoft's entity-images docs for the handful of messages that differ.</summary>
+        public string MessagePropertyName { get; set; } = "Target";
     }
 
     /// <summary>Identifies an existing PluginAssembly or PluginPackage record found by name.</summary>
@@ -140,6 +196,13 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         {
             new PluginOption(0, "Synchronous"),
             new PluginOption(1, "Asynchronous"),
+        };
+
+        public static readonly IReadOnlyList<PluginOption> RegisterableImageTypes = new List<PluginOption>
+        {
+            new PluginOption(0, "Pre Image"),
+            new PluginOption(1, "Post Image"),
+            new PluginOption(2, "Both"),
         };
     }
 

@@ -19,17 +19,31 @@
         <conv:BoolToVisibilityConverter x:Key="BoolToVisibleConverter" />
         <conv:BoolToOpacityConverter x:Key="BoolToOpacityConverter" />
         <conv:BoolToAssemblyIconConverter x:Key="BoolToAssemblyIconConverter" />
+        <conv:InverseBoolConverter x:Key="InverseBoolConverter" />
         <dlg:EmptyToCollapsedConverter x:Key="EmptyToCollapsedConverter" />
 
+        <ContextMenu x:Key="AssemblyContextMenu">
+            <MenuItem Header="Edit Description..." Click="OnEditAssemblyDescriptionClick" />
+            <MenuItem Header="Unregister..." Click="OnUnregisterAssemblyClick" />
+        </ContextMenu>
         <ContextMenu x:Key="TypeContextMenu">
             <MenuItem Header="Add Step..." Click="OnAddStepClick" />
+            <MenuItem Header="Unregister..." Click="OnUnregisterTypeClick" />
         </ContextMenu>
         <ContextMenu x:Key="StepContextMenu">
             <MenuItem Header="Edit Step..." Click="OnEditStepClick" />
+            <MenuItem Header="Enable" Click="OnEnableStepClick" IsEnabled="{Binding IsEnabled, Converter={StaticResource InverseBoolConverter}}" />
+            <MenuItem Header="Disable" Click="OnDisableStepClick" IsEnabled="{Binding IsEnabled}" />
+            <MenuItem Header="Add Image..." Click="OnAddImageClick" />
+            <MenuItem Header="Unregister..." Click="OnUnregisterStepClick" />
+        </ContextMenu>
+        <ContextMenu x:Key="ImageContextMenu">
+            <MenuItem Header="Edit Image..." Click="OnEditImageClick" />
+            <MenuItem Header="Unregister..." Click="OnUnregisterImageClick" />
         </ContextMenu>
 
         <DataTemplate x:Key="ImageTemplate">
-            <Grid Margin="0,1">
+            <Grid Margin="0,1" ContextMenu="{StaticResource ImageContextMenu}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
@@ -74,7 +88,7 @@
         </HierarchicalDataTemplate>
 
         <HierarchicalDataTemplate x:Key="AssemblyTemplate" ItemsSource="{Binding Types}" ItemTemplate="{StaticResource TypeTemplate}">
-            <Grid Margin="0,2">
+            <Grid Margin="0,2" ContextMenu="{StaticResource AssemblyContextMenu}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -82,7 +96,7 @@
                 </Grid.ColumnDefinitions>
                 <img:CrispImage Grid.Column="0" Width="16" Height="16" Margin="0,0,4,0" VerticalAlignment="Center"
                                 Moniker="{Binding HasPackage, Converter={StaticResource BoolToAssemblyIconConverter}}" />
-                <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="Bold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Description}" />
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
                     <TextBlock Margin="6,0,0,0" Opacity="0.6" FontSize="11" Text="{Binding PackageName}"
                                Visibility="{Binding HasPackage, Converter={StaticResource BoolToVisibleConverter}}" />

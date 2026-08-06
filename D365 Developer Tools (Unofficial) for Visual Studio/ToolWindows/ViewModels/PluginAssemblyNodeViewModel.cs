@@ -21,6 +21,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         public string SourceType => Assembly.SourceType;
         public string PackageName => Assembly.PackageName;
         public bool HasPackage => !string.IsNullOrEmpty(Assembly.PackageName);
+        public string Description => Assembly.Description;
 
         public string SearchText => Name?.ToLowerInvariant() ?? string.Empty;
 
@@ -56,6 +57,20 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             Types.Add(null);
         }
 
+        /// <summary>Reflects a successfully saved description edit back into the tree without a full reload.</summary>
+        public void UpdateDescription(string description)
+        {
+            Assembly.Description = description;
+            OnPropertyChanged(nameof(Description));
+        }
+
+        /// <summary>Forces a reload of this assembly's plugin types, e.g. after unregistering one.</summary>
+        public Task ReloadTypesAsync()
+        {
+            _typesLoaded = false;
+            return LoadTypesAsync();
+        }
+
         private async Task LoadTypesAsync()
         {
             _typesLoaded = true;
@@ -66,7 +81,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             {
                 var types = await _client.GetPluginTypesAsync(Assembly.PluginAssemblyId).ConfigureAwait(true);
                 Types.Clear();
-                foreach (var type in types) { Types.Add(new PluginTypeNodeViewModel(type, _client, Assembly.PluginAssemblyId)); }
+                foreach (var type in types) { Types.Add(new PluginTypeNodeViewModel(type, _client, Assembly.PluginAssemblyId) { Owner = this }); }
             }
             catch (Exception ex)
             {

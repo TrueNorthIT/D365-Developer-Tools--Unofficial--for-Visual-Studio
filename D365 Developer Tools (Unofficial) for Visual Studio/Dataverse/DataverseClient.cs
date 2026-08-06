@@ -166,7 +166,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         {
             var url = ApiUrl(
                 "pluginassemblies",
-                "$select=pluginassemblyid,name,version,isolationmode,sourcetype,_packageid_value");
+                "$select=pluginassemblyid,name,version,isolationmode,sourcetype,description,_packageid_value");
 
             var raw = await FetchPagedAsync<PluginAssemblyDto>(url).ConfigureAwait(false);
 
@@ -190,6 +190,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                         SourceType = PluginOptionLabels.SourceType(a.SourceType),
                         PackageName = package?.Name,
                         PackageVersion = package?.Version,
+                        Description = a.Description,
                     };
                 })
                 .OrderBy(a => a.Name, StringComparer.Ordinal)
@@ -240,7 +241,8 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         {
             var queryParts = new List<string>
             {
-                "$select=sdkmessageprocessingstepid,name,stage,mode,rank,statecode,filteringattributes,_sdkmessageid_value,_sdkmessagefilterid_value",
+                "$select=sdkmessageprocessingstepid,name,stage,mode,rank,statecode,filteringattributes,description,configuration," +
+                    "_sdkmessageid_value,_sdkmessagefilterid_value,_impersonatinguserid_value,_sdkmessageprocessingstepsecureconfigid_value",
                 $"$filter={filter}",
             };
             if (orderBy != null) { queryParts.Add(orderBy); }
@@ -274,6 +276,10 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                     Rank = s.Rank,
                     IsEnabled = s.StateCode == 0,
                     FilteringAttributes = s.FilteringAttributes,
+                    Description = s.Description,
+                    UnsecureConfiguration = s.Configuration,
+                    ImpersonatingUserId = s.ImpersonatingUserIdValue,
+                    SecureConfigId = s.SecureConfigIdValue,
                 })
                 .ToList();
         }
@@ -311,11 +317,33 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                     ImageId = i.SdkMessageProcessingStepImageId,
                     Name = i.Name,
                     EntityAlias = i.EntityAlias,
+                    ImageTypeValue = i.ImageType,
                     ImageType = PluginOptionLabels.ImageType(i.ImageType),
                     Attributes = i.Attributes,
                 })
                 .ToList();
         }
+
+        public Task<string> CreateSdkMessageStepImageAsync(string stepId, ImageRegistrationDetails details) =>
+            CreateRecordAsync("sdkmessageprocessingstepimages", new Dictionary<string, object>
+            {
+                ["name"] = details.Name,
+                ["entityalias"] = details.EntityAlias,
+                ["imagetype"] = details.ImageType,
+                ["attributes"] = details.Attributes,
+                ["messagepropertyname"] = details.MessagePropertyName,
+                ["sdkmessageprocessingstepid@odata.bind"] = $"/sdkmessageprocessingsteps({stepId})",
+            }, null);
+
+        public Task UpdateSdkMessageStepImageAsync(string imageId, ImageRegistrationDetails details) =>
+            UpdateRecordAsync("sdkmessageprocessingstepimages", imageId, new Dictionary<string, object>
+            {
+                ["name"] = details.Name,
+                ["entityalias"] = details.EntityAlias,
+                ["imagetype"] = details.ImageType,
+                ["attributes"] = details.Attributes,
+                ["messagepropertyname"] = details.MessagePropertyName,
+            });
 
         // ── Publishing plugin assemblies / packages ─────────────────────────────
 
@@ -349,6 +377,10 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         public Task UpdatePluginAssemblyContentAsync(string pluginAssemblyId, string contentBase64, string version) =>
             UpdateRecordAsync("pluginassemblies", pluginAssemblyId, new { content = contentBase64, version });
 
+        /// <summary>Description is the only assembly field the Plugin Registration Tool itself lets you edit after registration.</summary>
+        public Task UpdatePluginAssemblyDescriptionAsync(string pluginAssemblyId, string description) =>
+            UpdateRecordAsync("pluginassemblies", pluginAssemblyId, new { description });
+
         public Task<string> CreatePluginPackageAsync(string name, string contentBase64, string version, string solutionUniqueName) =>
             CreateRecordAsync("pluginpackages", new
             {
@@ -367,14 +399,29 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
             return new HashSet<string>(raw.Select(t => t.TypeName), StringComparer.OrdinalIgnoreCase);
         }
 
-        public Task<string> CreatePluginTypeAsync(string pluginAssemblyId, string typeName, string friendlyName, string solutionUniqueName) =>
-            CreateRecordAsync("plugintypes", new Dictionary<string, object>
+        /// <summary>
+        /// workflowActivityGroupName should be non-null (and set to something meaningful, e.g. "{assembly} ({version})",
+        /// matching the Plugin Registration Tool's own default) for custom workflow activities — Dataverse won't surface
+        /// the activity in the classic process designer if it's left null. isworkflowactivity itself is read-only:
+        /// Dataverse determines it server-side from reflecting the assembly, so there's nothing to set for that part.
+        /// </summary>
+        public Task<string> CreatePluginTypeAsync(string pluginAssemblyId, string typeName, string friendlyName, string solutionUniqueName, string workflowActivityGroupName = null)
+        {
+            var body = new Dictionary<string, object>
             {
                 ["typename"] = typeName,
                 ["friendlyname"] = friendlyName,
                 ["name"] = typeName,
                 ["pluginassemblyid@odata.bind"] = $"/pluginassemblies({pluginAssemblyId})",
-            }, solutionUniqueName);
+            };
+
+            if (!string.IsNullOrEmpty(workflowActivityGroupName))
+            {
+                body["workflowactivitygroupname"] = workflowActivityGroupName;
+            }
+
+            return CreateRecordAsync("plugintypes", body, solutionUniqueName);
+        }
 
         /// <summary>Finds PluginType records matching a fully-qualified type name — may return more than one if the same type name exists in more than one assembly.</summary>
         public async Task<List<PluginTypeMatch>> FindPluginTypesByTypeNameAsync(string typeName)
@@ -405,6 +452,23 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                 .ToList();
         }
 
+        // ── Unregistering plugin assemblies / types / steps / images ───────────
+
+        /// <summary>Fails if any SdkMessageProcessingSteps still depend on this assembly's types — the same referential-integrity rule the Plugin Registration Tool relies on.</summary>
+        public Task DeletePluginAssemblyAsync(string pluginAssemblyId) => DeleteRecordAsync("pluginassemblies", pluginAssemblyId);
+
+        /// <summary>Fails if any SdkMessageProcessingSteps still reference this type.</summary>
+        public Task DeletePluginTypeAsync(string pluginTypeId) => DeleteRecordAsync("plugintypes", pluginTypeId);
+
+        public Task DeleteSdkMessageStepAsync(string stepId) => DeleteRecordAsync("sdkmessageprocessingsteps", stepId);
+
+        public Task DeleteSdkMessageStepImageAsync(string imageId) => DeleteRecordAsync("sdkmessageprocessingstepimages", imageId);
+
+        private async Task DeleteRecordAsync(string entitySetName, string id)
+        {
+            using (await SendAsync(RecordUrl(entitySetName, id), HttpMethod.Delete, null, null).ConfigureAwait(false)) { }
+        }
+
         /// <summary>Returns the solutions (from the same set GetSolutionsAsync returns) that contain the given plugin assembly.</summary>
         public Task<List<DataverseSolution>> GetSolutionsContainingPluginAssemblyAsync(string pluginAssemblyId) =>
             GetSolutionsContainingComponentAsync(pluginAssemblyId, componentType: 91); // Plugin Assembly
@@ -426,6 +490,14 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
 
             var allSolutions = await GetSolutionsAsync().ConfigureAwait(false);
             return allSolutions.Where(s => solutionIds.Contains(s.SolutionId)).ToList();
+        }
+
+        /// <summary>Enabled users, for the step editor's "Run in User's Context" (impersonation) picker.</summary>
+        public async Task<List<SystemUserOption>> GetUsersAsync()
+        {
+            var url = ApiUrl("systemusers", "$select=systemuserid,fullname", "$filter=isdisabled eq false", "$orderby=fullname");
+            var raw = await FetchPagedAsync<SystemUserDto>(url).ConfigureAwait(false);
+            return raw.Select(u => new SystemUserOption { UserId = u.SystemUserId, FullName = u.FullName }).ToList();
         }
 
         public async Task<List<SdkMessageOption>> GetSdkMessagesAsync()
@@ -451,83 +523,125 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                 .ToList();
         }
 
-        public Task<string> CreateSdkMessageStepAsync(
-            string pluginTypeId,
-            string sdkMessageId,
-            string sdkMessageFilterId,
-            string name,
-            int stage,
-            int mode,
-            int rank,
-            string filteringAttributes,
-            string solutionUniqueName)
+        public async Task<string> CreateSdkMessageStepAsync(string pluginTypeId, StepRegistrationDetails details)
         {
             var body = new Dictionary<string, object>
             {
-                ["name"] = name,
-                ["stage"] = stage,
-                ["mode"] = mode,
-                ["rank"] = rank,
+                ["name"] = details.Name,
+                ["stage"] = details.Stage,
+                ["mode"] = details.Mode,
+                ["rank"] = details.Rank,
+                ["description"] = details.Description,
+                ["configuration"] = details.UnsecureConfiguration,
                 ["plugintypeid@odata.bind"] = $"/plugintypes({pluginTypeId})",
-                ["sdkmessageid@odata.bind"] = $"/sdkmessages({sdkMessageId})",
+                ["sdkmessageid@odata.bind"] = $"/sdkmessages({details.SdkMessageId})",
             };
 
-            if (!string.IsNullOrEmpty(sdkMessageFilterId))
+            if (!string.IsNullOrEmpty(details.SdkMessageFilterId))
             {
-                body["sdkmessagefilterid@odata.bind"] = $"/sdkmessagefilters({sdkMessageFilterId})";
+                body["sdkmessagefilterid@odata.bind"] = $"/sdkmessagefilters({details.SdkMessageFilterId})";
             }
 
-            if (!string.IsNullOrEmpty(filteringAttributes))
+            if (!string.IsNullOrEmpty(details.FilteringAttributes))
             {
-                body["filteringattributes"] = filteringAttributes;
+                body["filteringattributes"] = details.FilteringAttributes;
             }
 
-            return CreateRecordAsync("sdkmessageprocessingsteps", body, solutionUniqueName);
+            if (!string.IsNullOrEmpty(details.ImpersonatingUserId))
+            {
+                body["impersonatinguserid@odata.bind"] = $"/systemusers({details.ImpersonatingUserId})";
+            }
+
+            if (!string.IsNullOrEmpty(details.SecureConfiguration))
+            {
+                var secureConfigId = await CreateSdkMessageStepSecureConfigAsync(details.SecureConfiguration).ConfigureAwait(false);
+                body["sdkmessageprocessingstepsecureconfigid@odata.bind"] = $"/sdkmessageprocessingstepsecureconfigs({secureConfigId})";
+            }
+
+            return await CreateRecordAsync("sdkmessageprocessingsteps", body, details.SolutionUniqueName).ConfigureAwait(false);
         }
 
         /// <summary>
         /// Updates an existing SDK message processing step. Message/entity/stage/mode/rank/filtering
         /// attributes are all editable, matching the Plugin Registration Tool's own "Update Step" dialog.
-        /// Clearing the entity filter (switching back to "all entities") needs a separate $ref delete —
-        /// Web API PATCH can't null out a single-valued navigation property by binding it to nothing.
+        /// Clearing the entity filter or impersonating user (switching back to "all entities" / "calling
+        /// user") needs a separate $ref delete — Web API PATCH can't null out a single-valued navigation
+        /// property by binding it to nothing. A blank SecureConfiguration is treated as "leave it
+        /// unchanged", not "clear it" — see StepRegistrationDetails.SecureConfiguration.
         /// </summary>
-        public async Task UpdateSdkMessageStepAsync(
-            string stepId,
-            string sdkMessageId,
-            string sdkMessageFilterId,
-            string name,
-            int stage,
-            int mode,
-            int rank,
-            string filteringAttributes,
-            string solutionUniqueName)
+        public async Task UpdateSdkMessageStepAsync(string stepId, StepRegistrationDetails details)
         {
             var body = new Dictionary<string, object>
             {
-                ["name"] = name,
-                ["stage"] = stage,
-                ["mode"] = mode,
-                ["rank"] = rank,
-                ["filteringattributes"] = filteringAttributes,
-                ["sdkmessageid@odata.bind"] = $"/sdkmessages({sdkMessageId})",
+                ["name"] = details.Name,
+                ["stage"] = details.Stage,
+                ["mode"] = details.Mode,
+                ["rank"] = details.Rank,
+                ["filteringattributes"] = details.FilteringAttributes,
+                ["description"] = details.Description,
+                ["configuration"] = details.UnsecureConfiguration,
+                ["sdkmessageid@odata.bind"] = $"/sdkmessages({details.SdkMessageId})",
             };
 
-            if (!string.IsNullOrEmpty(sdkMessageFilterId))
+            if (!string.IsNullOrEmpty(details.SdkMessageFilterId))
             {
-                body["sdkmessagefilterid@odata.bind"] = $"/sdkmessagefilters({sdkMessageFilterId})";
+                body["sdkmessagefilterid@odata.bind"] = $"/sdkmessagefilters({details.SdkMessageFilterId})";
             }
 
-            await UpdateRecordAsync("sdkmessageprocessingsteps", stepId, body, solutionUniqueName).ConfigureAwait(false);
+            if (!string.IsNullOrEmpty(details.ImpersonatingUserId))
+            {
+                body["impersonatinguserid@odata.bind"] = $"/systemusers({details.ImpersonatingUserId})";
+            }
 
-            if (string.IsNullOrEmpty(sdkMessageFilterId))
+            if (!string.IsNullOrEmpty(details.SecureConfiguration))
+            {
+                if (string.IsNullOrEmpty(details.ExistingSecureConfigId))
+                {
+                    var secureConfigId = await CreateSdkMessageStepSecureConfigAsync(details.SecureConfiguration).ConfigureAwait(false);
+                    body["sdkmessageprocessingstepsecureconfigid@odata.bind"] = $"/sdkmessageprocessingstepsecureconfigs({secureConfigId})";
+                }
+                else
+                {
+                    await UpdateSdkMessageStepSecureConfigAsync(details.ExistingSecureConfigId, details.SecureConfiguration).ConfigureAwait(false);
+                }
+            }
+
+            await UpdateRecordAsync("sdkmessageprocessingsteps", stepId, body, details.SolutionUniqueName).ConfigureAwait(false);
+
+            if (string.IsNullOrEmpty(details.SdkMessageFilterId))
             {
                 await ClearSdkMessageStepFilterAsync(stepId).ConfigureAwait(false);
             }
+
+            if (string.IsNullOrEmpty(details.ImpersonatingUserId))
+            {
+                await ClearSdkMessageStepImpersonationAsync(stepId).ConfigureAwait(false);
+            }
         }
+
+        /// <summary>Activates or deactivates a registered step. Enabled = statecode 0/statuscode 1, Disabled = statecode 1/statuscode 2.</summary>
+        public Task SetSdkMessageStepEnabledAsync(string stepId, bool enabled) =>
+            UpdateRecordAsync("sdkmessageprocessingsteps", stepId, new
+            {
+                statecode = enabled ? 0 : 1,
+                statuscode = enabled ? 1 : 2,
+            });
+
+        private Task<string> CreateSdkMessageStepSecureConfigAsync(string secureConfigValue) =>
+            CreateRecordAsync("sdkmessageprocessingstepsecureconfigs", new { secureconfig = secureConfigValue }, null);
+
+        private Task UpdateSdkMessageStepSecureConfigAsync(string secureConfigId, string secureConfigValue) =>
+            UpdateRecordAsync("sdkmessageprocessingstepsecureconfigs", secureConfigId, new { secureconfig = secureConfigValue });
 
         private async Task ClearSdkMessageStepFilterAsync(string stepId)
         {
             var url = $"{RecordUrl("sdkmessageprocessingsteps", stepId)}/sdkmessagefilterid/$ref";
+            using (await SendAsync(url, HttpMethod.Delete, null, null, HttpStatusCode.NotFound).ConfigureAwait(false)) { }
+        }
+
+        private async Task ClearSdkMessageStepImpersonationAsync(string stepId)
+        {
+            var url = $"{RecordUrl("sdkmessageprocessingsteps", stepId)}/impersonatinguserid/$ref";
             using (await SendAsync(url, HttpMethod.Delete, null, null, HttpStatusCode.NotFound).ConfigureAwait(false)) { }
         }
 

@@ -57,8 +57,18 @@ plugin assemblies, similar to the Plugin Registration Tool.
   [Publish to Dataverse](#publish-to-dataverse)); the tree refreshes afterward
 - Right-click a plugin type → **Add Step...** to register a new step for it (see [Add Step](#add-step))
 - Right-click a step → **Edit Step...** to change its message, target entity, stage, execution mode,
-  execution order, filtering attributes, or solution — the same dialog as Add Step, pre-filled with the
-  step's current values
+  execution order, filtering attributes, solution, impersonation, configuration, or description — the
+  same dialog as Add Step, pre-filled with the step's current values
+- Right-click a step → **Enable**/**Disable** to activate or deactivate it in place, without opening the
+  edit dialog
+- Right-click an assembly, plugin type, step, or image → **Unregister...** to delete it after
+  confirming — unregistering an assembly or type fails if steps still depend on it, the same
+  referential-integrity rule the Plugin Registration Tool enforces
+- Right-click a step → **Add Image...**, or an existing image → **Edit Image...**, to set its name,
+  entity alias, image type (Pre/Post/Both), and attributes — previously images could only be viewed,
+  not created or changed
+- Right-click an assembly → **Edit Description...** — its current description also shows as a tooltip
+  on the row
 
 ### Publish to Dataverse
 
@@ -69,12 +79,15 @@ deploy it without leaving Visual Studio.
 2. Looks for an existing Plugin Assembly or Plugin Package in the connected environment with the same
    name as the built assembly.
    - **Found** — uploads the new build to it. If it's a traditional plugin assembly, the build is also
-     scanned for `IPlugin` implementations and any newly added ones are registered as Plugin Types
-     (existing ones are left alone, so registered steps are never disturbed).
+     scanned for `IPlugin` implementations and classes deriving from `System.Activities.CodeActivity`
+     (custom workflow activities), and any newly added ones are registered as Plugin Types (existing
+     ones are left alone, so registered steps are never disturbed).
    - **Not found (first publish)** — the first time you publish a given project, you'll be asked which
      deployment model to use:
      - **Traditional Plugin Assembly** — uploads the .dll to a Plugin Assembly record, then registers a
-       Plugin Type for each `IPlugin` implementation it finds.
+       Plugin Type for each `IPlugin` implementation and custom workflow activity it finds. Workflow
+       activities are grouped under `{assembly name} ({version})` in the classic process designer,
+       matching the Plugin Registration Tool's own default.
      - **NuGet-style Plugin Package** — uploads to a Plugin Package record; Dataverse derives the
        plugin types from the package itself.
 
@@ -95,6 +108,10 @@ Step...** to register a new step for it without leaving Visual Studio.
   attributes.
 - **Solution** defaults to the one solution the plugin's assembly belongs to, if it's only in one;
   otherwise you can pick one from the list, or leave it unset.
+- Also sets **Run in user's context** (impersonation), **Description**, and unsecure/secure
+  **Configuration** — the secure configuration field is always blank when editing an existing step
+  (Dataverse never returns its value), and leaving it blank on update keeps whatever is already stored
+  rather than clearing it.
 
 ### C# Class Generation
 
