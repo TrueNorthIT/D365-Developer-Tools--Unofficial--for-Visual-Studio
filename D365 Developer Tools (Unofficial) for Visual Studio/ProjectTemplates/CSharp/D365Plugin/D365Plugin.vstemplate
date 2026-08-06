@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VSTemplate Version="3.0.0" Type="Project" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005">
+  <TemplateData>
+    <Name>D365 Plugin Project</Name>
+    <Description>A class library for developing Microsoft Dataverse plug-ins, targeting net462 and referencing Microsoft.CrmSdk.CoreAssemblies.</Description>
+    <ProjectType>CSharp</ProjectType>
+    <RequiredFrameworkVersion>4.6.2</RequiredFrameworkVersion>
+    <SortOrder>1000</SortOrder>
+    <TemplateID>7a1c9e3a-4b2d-4e7f-9a1b-2c3d4e5f6a7b</TemplateID>
+    <CreateNewFolder>true</CreateNewFolder>
+    <DefaultName>D365PluginProject</DefaultName>
+    <ProvideDefaultName>true</ProvideDefaultName>
+  </TemplateData>
+  <TemplateContent>
+    <Project File="ProjectTemplate.csproj" ReplaceParameters="true">
+      <ProjectItem ReplaceParameters="true" OpenInEditor="true">Plugin1.cs</ProjectItem>
+    </Project>
+  </TemplateContent>
+</VSTemplate>

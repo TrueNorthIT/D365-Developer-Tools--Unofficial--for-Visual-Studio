@@ -35,11 +35,67 @@
     <None Include="README.md" />
   </ItemGroup>
 
+  <!-- ProjectTemplates\CSharp\D365Plugin\ is raw .vstemplate content (with $safeprojectname$ tokens),
+       not real source of this extension - exclude its .cs file from compilation. -->
+  <ItemGroup>
+    <Compile Remove="ProjectTemplates\**\*.cs" />
+  </ItemGroup>
+
+  <!-- Zips the D365 Plugin project template into the VSIX as a plain Content asset instead of relying
+       on the classic VSSDK "VSTemplate item + TemplateProjectOutputGroup" auto-zip pipeline: in this
+       VssdkCompatibleExtension + VisualStudio.Extensibility hybrid project, that pipeline resolves the
+       manifest's output-group placeholder to a bare filename ("D365Plugin.zip") but never actually
+       copies the zip into the built .vsix, so the referenced asset is silently missing at install
+       time. Pre-zipping and including it like any other Content file is the documented workaround. -->
+  <PropertyGroup>
+    <D365PluginTemplateSourceDir>$(MSBuildProjectDirectory)\ProjectTemplates\CSharp\D365Plugin\</D365PluginTemplateSourceDir>
+  </PropertyGroup>
+
+  <!--
+    D365PluginTemplateZip is deliberately NOT a top-level property: $(IntermediateOutputPath) isn't
+    assigned its real value ("obj\Debug\net472\") until Sdk.targets (imported after all of this file's
+    content) runs its own PropertyGroups, so a top-level property referencing it here would
+    permanently capture an empty string. Referencing it inside a Target's attributes/tasks instead
+    works, because target execution happens only after the whole project has finished evaluating.
+
+    The Content item is added in a second, unconditional target (no Inputs/Outputs) rather than inside
+    ZipD365PluginTemplate itself, because an up-to-date incremental build skips that target's body
+    entirely — including any nested <ItemGroup> — which would silently drop the item on every build
+    after the first.
+  -->
+  <Target Name="ZipD365PluginTemplate" BeforeTargets="BeforeBuild"
+          Inputs="$(D365PluginTemplateSourceDir)D365Plugin.vstemplate;$(D365PluginTemplateSourceDir)Plugin1.cs;$(D365PluginTemplateSourceDir)ProjectTemplate.csproj"
+          Outputs="$(MSBuildProjectDirectory)\$(IntermediateOutputPath)ProjectTemplates\D365Plugin.zip">
+    <PropertyGroup>
+      <_D365PluginTemplateZip>$(MSBuildProjectDirectory)\$(IntermediateOutputPath)ProjectTemplates\D365Plugin.zip</_D365PluginTemplateZip>
+    </PropertyGroup>
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(_D365PluginTemplateZip)'))" />
+    <ZipDirectory SourceDirectory="$(D365PluginTemplateSourceDir)" DestinationFile="$(_D365PluginTemplateZip)" Overwrite="true" />
+  </Target>
+
+  <Target Name="AddD365PluginTemplateContentItem" BeforeTargets="BeforeBuild" AfterTargets="ZipD365PluginTemplate">
+    <ItemGroup>
+      <Content Include="$(MSBuildProjectDirectory)\$(IntermediateOutputPath)ProjectTemplates\D365Plugin.zip" Link="ProjectTemplates\D365Plugin.zip">
+        <IncludeInVSIX>true</IncludeInVSIX>
+        <VSIXSubPath>ProjectTemplates</VSIXSubPath>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
     <Reference Include="EnvDTE" />
     <Reference Include="EnvDTE80" />
     <Reference Include="System.Design" />
     <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+  <!-- Classic VSCT registration for the Solution Explorer project-node context menu (see Guids.cs's
+       ProjectContextMenuCmdSetString comment for why this can't use the new Extensibility model). -->
+  <ItemGroup>
+    <VSCTCompile Include="ProjectContextMenu.vsct">
+      <ResourceName>Menus.ctmenu</ResourceName>
+    </VSCTCompile>
   </ItemGroup>
 
   <ItemGroup>
@@ -50,6 +106,33 @@
     <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.61.3" />
     <PackageReference Include="Microsoft.Identity.Client.Desktop" Version="4.61.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="8.0.0" />
+    <PackageReference Include="SharpVectors" Version="1.8.5" />
   </ItemGroup>
+
+  <!-- The MCP server is a standalone .NET 8 console app (it hosts the MCP C# SDK, which targets a
+       modern runtime incompatible with this project's net472/VS-SDK requirement) that ships bundled
+       inside this extension's VSIX so "D365: Configure MCP Server for this Solution" can point Claude
+       Code at it without the user installing anything separately. Publishing it here, rather than via
+       a normal ProjectReference, is what lets its output land in the VSIX: content produced by a
+       ProjectReference's own build isn't visible to VSSDK's Content-item globbing, but files added to
+       @(Content) from inside a target - as done here - are. -->
+  <PropertyGroup>
+    <_McpServerProject>$(MSBuildThisFileDirectory)..\D365 Developer Tools (Unofficial) for Visual Studio.McpServer\D365 Developer Tools (Unofficial) for Visual Studio.McpServer.csproj</_McpServerProject>
+    <_McpServerPublishDir>$(MSBuildThisFileDirectory)$(BaseIntermediateOutputPath)McpServerPublish\</_McpServerPublishDir>
+  </PropertyGroup>
+
+  <Target Name="PublishMcpServer" BeforeTargets="GetVsixSourceItems" Condition="Exists('$(_McpServerProject)')">
+    <MSBuild Projects="$(_McpServerProject)" Targets="Restore;Publish"
+             Properties="Configuration=$(Configuration);PublishDir=$(_McpServerPublishDir);SelfContained=false" />
+    <ItemGroup>
+      <_McpServerFile Include="$(_McpServerPublishDir)**\*.*" />
+      <Content Include="@(_McpServerFile)">
+        <Link>McpServer\%(RecursiveDir)%(Filename)%(Extension)</Link>
+        <IncludeInVSIX>true</IncludeInVSIX>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+  </Target>
 
 </Project>
