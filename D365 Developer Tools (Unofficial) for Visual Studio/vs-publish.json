@@ -1,12 +1,12 @@
 {
     "$schema": "http://json.schemastore.org/vsix-publish",
-    "categories": [ "coding", "database" ],
+    "categories": [ "coding" ],
     "identity": {
         "internalName": "D365DeveloperToolsUnofficialForVisualStudio"
     },
     "overview": "README.md",
     "priceCategory": "free",
-    "publisher": "TrueNorth IT",
+    "publisher": "TrueNorth",
     "private": false,
     "qna": true,
     "repo": "https://github.com/TrueNorthIT/D365-Developer-Tools--Unofficial--for-Visual-Studio"

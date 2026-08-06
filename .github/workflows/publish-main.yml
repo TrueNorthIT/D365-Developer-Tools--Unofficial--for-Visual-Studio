@@ -1,0 +1,19 @@
+name: Publish (main)
+
+# Runs on every merge to main. Publishes to the real Visual Studio
+# Marketplace using whatever Major.Minor.Patch version is already checked
+# into source.extension.vsixmanifest - bump that by hand in the release PR
+# before merging.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  publish:
+    uses: ./.github/workflows/_publish-vsix.yml
+    with:
+      bump_run_number: false
+    secrets:
+      VS_MARKETPLACE_PAT: ${{ secrets.VS_MARKETPLACE_PAT }}
