@@ -98,7 +98,16 @@ jobs:
           $vsix = Get-ChildItem -Path $env:PROJECT_DIR -Recurse -Filter *.vsix | Select-Object -First 1
           if (-not $vsix) { throw "No .vsix file found under $env:PROJECT_DIR" }
           Write-Host "Found VSIX: $($vsix.FullName)"
-          "path=$($vsix.FullName)" >> $env:GITHUB_OUTPUT
+
+          # The Marketplace rejects payload file names containing spaces/parentheses
+          # (VsixPub0036), which the built file name has since it's derived from the
+          # project's AssemblyName. Copy it to a sanitized name for upload only -
+          # this doesn't affect the installed extension's identity, which comes from
+          # source.extension.vsixmanifest, not the uploaded file's name.
+          $sanitizedPath = Join-Path $vsix.DirectoryName "D365DeveloperToolsUnofficialForVisualStudio.vsix"
+          Copy-Item -Path $vsix.FullName -Destination $sanitizedPath -Force
+          Write-Host "Copied to sanitized payload name: $sanitizedPath"
+          "path=$sanitizedPath" >> $env:GITHUB_OUTPUT
 
       - name: Locate VsixPublisher.exe
         id: publisher
