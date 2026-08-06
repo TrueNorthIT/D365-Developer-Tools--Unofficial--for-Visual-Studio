@@ -1,0 +1,103 @@
+<vsp:DialogWindow x:Class="D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs.CustomApiEditorDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:conv="clr-namespace:D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Converters"
+        xmlns:controls="clr-namespace:D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Controls"
+        xmlns:vsp="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
+        x:ClassModifier="internal"
+        Title="{Binding DialogTitle}" Height="650" Width="500"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="{DynamicResource {x:Static vsp:EnvironmentColors.ToolWindowBackgroundBrushKey}}"
+        Foreground="{DynamicResource {x:Static vsp:EnvironmentColors.ToolWindowTextBrushKey}}">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Styles/ThemedControls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+        <conv:BoolToVisibilityConverter x:Key="BoolToVisibleConverter" />
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="16">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" /> <!-- UniqueName -->
+            <RowDefinition Height="Auto" /> <!-- Name -->
+            <RowDefinition Height="Auto" /> <!-- DisplayName -->
+            <RowDefinition Height="Auto" /> <!-- Description -->
+            <RowDefinition Height="Auto" /> <!-- Solution -->
+            <RowDefinition Height="Auto" /> <!-- BindingType -->
+            <RowDefinition Height="Auto" /> <!-- BoundEntity -->
+            <RowDefinition Height="Auto" /> <!-- ProcessingStepType -->
+            <RowDefinition Height="Auto" /> <!-- IsFunction -->
+            <RowDefinition Height="Auto" /> <!-- IsPrivate -->
+            <RowDefinition Height="Auto" /> <!-- ExecutePrivilegeName -->
+            <RowDefinition Height="Auto" /> <!-- Assembly -->
+            <RowDefinition Height="Auto" /> <!-- Plugin -->
+            <RowDefinition Height="Auto" /> <!-- Buttons -->
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="150" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Unique name" />
+        <TextBox Grid.Row="0" Grid.Column="1" Margin="0,4" Padding="3" Text="{Binding UniqueName, UpdateSourceTrigger=PropertyChanged}"
+                 IsEnabled="{Binding CanEditImmutableFields}" />
+
+        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Name" />
+        <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4" Padding="3" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Display name" />
+        <TextBox Grid.Row="2" Grid.Column="1" Margin="0,4" Padding="3" Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="Description" />
+        <TextBox Grid.Row="3" Grid.Column="1" Margin="0,4" Padding="3" Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Solution" />
+        <controls:FilterableComboBox Grid.Row="4" Grid.Column="1" Margin="0,4"
+                  ItemsSource="{Binding Solutions}" DisplayMemberPath="FriendlyName" SelectedItem="{Binding SelectedSolution}" />
+
+        <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Text="Binding type" />
+        <controls:FilterableComboBox Grid.Row="5" Grid.Column="1" Margin="0,4" IsEnabled="{Binding CanEditImmutableFields}"
+                  ItemsSource="{Binding BindingTypes}" DisplayMemberPath="Label" SelectedItem="{Binding SelectedBindingType}" />
+
+        <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="Bound entity"
+                   Visibility="{Binding IsEntityBound, Converter={StaticResource BoolToVisibleConverter}}" />
+        <controls:FilterableComboBox Grid.Row="6" Grid.Column="1" Margin="0,4" IsEnabled="{Binding CanEditImmutableFields}"
+                  Visibility="{Binding IsEntityBound, Converter={StaticResource BoolToVisibleConverter}}"
+                  ItemsSource="{Binding Entities}" DisplayMemberPath="DisplayName" SelectedItem="{Binding SelectedEntity}" />
+
+        <TextBlock Grid.Row="7" Grid.Column="0" VerticalAlignment="Center" Text="Allowed step type" />
+        <controls:FilterableComboBox Grid.Row="7" Grid.Column="1" Margin="0,4" IsEnabled="{Binding CanEditImmutableFields}"
+                  ItemsSource="{Binding ProcessingStepTypes}" DisplayMemberPath="Label" SelectedItem="{Binding SelectedProcessingStepType}" />
+
+        <TextBlock Grid.Row="8" Grid.Column="0" VerticalAlignment="Center" Text="Function" />
+        <CheckBox Grid.Row="8" Grid.Column="1" Margin="0,4" VerticalAlignment="Center" IsChecked="{Binding IsFunction}"
+                   IsEnabled="{Binding CanEditImmutableFields}" Content="GET is supported instead of POST" />
+
+        <TextBlock Grid.Row="9" Grid.Column="0" VerticalAlignment="Center" Text="Private" />
+        <CheckBox Grid.Row="9" Grid.Column="1" Margin="0,4" VerticalAlignment="Center" IsChecked="{Binding IsPrivate}"
+                   Content="Hidden from metadata and documentation" />
+
+        <TextBlock Grid.Row="10" Grid.Column="0" VerticalAlignment="Center" Text="Execute privilege" />
+        <TextBox Grid.Row="10" Grid.Column="1" Margin="0,4" Padding="3" Text="{Binding ExecutePrivilegeName, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Grid.Row="11" Grid.Column="0" VerticalAlignment="Center" Text="Assembly" />
+        <controls:FilterableComboBox Grid.Row="11" Grid.Column="1" Margin="0,4"
+                  ItemsSource="{Binding Assemblies}" DisplayMemberPath="Name" SelectedItem="{Binding SelectedAssembly}" />
+
+        <TextBlock Grid.Row="12" Grid.Column="0" VerticalAlignment="Center" Text="Plugin" />
+        <controls:FilterableComboBox Grid.Row="12" Grid.Column="1" Margin="0,4"
+                  ItemsSource="{Binding PluginTypes}" DisplayMemberPath="FriendlyName" SelectedItem="{Binding SelectedPluginType}" />
+
+        <StackPanel Grid.Row="13" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="{Binding OkButtonLabel}" Width="80" IsDefault="True" Click="OnOk" Margin="0,0,8,0" />
+            <Button Content="Cancel" Width="80" IsCancel="True" />
+        </StackPanel>
+    </Grid>
+    </ScrollViewer>
+</vsp:DialogWindow>

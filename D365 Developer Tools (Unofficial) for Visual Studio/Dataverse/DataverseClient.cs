@@ -469,6 +469,183 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
             using (await SendAsync(RecordUrl(entitySetName, id), HttpMethod.Delete, null, null).ConfigureAwait(false)) { }
         }
 
+        // ── Custom APIs ──────────────────────────────────────────────────────
+
+        public async Task<List<CustomApiDefinition>> GetCustomApisAsync()
+        {
+            var url = ApiUrl(
+                "customapis",
+                "$select=customapiid,uniquename,name,displayname,description,bindingtype,boundentitylogicalname," +
+                    "allowedcustomprocessingsteptype,isfunction,isprivate,executeprivilegename,_plugintypeid_value",
+                "$orderby=name");
+
+            var raw = await FetchPagedAsync<CustomApiDto>(url).ConfigureAwait(false);
+
+            return raw
+                .Select(a => new CustomApiDefinition
+                {
+                    CustomApiId = a.CustomApiId,
+                    UniqueName = a.UniqueName,
+                    Name = a.Name,
+                    DisplayName = a.DisplayName,
+                    Description = a.Description,
+                    BindingTypeValue = a.BindingType,
+                    BindingType = CustomApiOptionLabels.BindingType(a.BindingType),
+                    BoundEntityLogicalName = a.BoundEntityLogicalName,
+                    AllowedCustomProcessingStepTypeValue = a.AllowedCustomProcessingStepType,
+                    AllowedCustomProcessingStepType = CustomApiOptionLabels.ProcessingStepType(a.AllowedCustomProcessingStepType),
+                    IsFunction = a.IsFunction,
+                    IsPrivate = a.IsPrivate,
+                    ExecutePrivilegeName = a.ExecutePrivilegeName,
+                    PluginTypeId = a.PluginTypeIdValue,
+                })
+                .ToList();
+        }
+
+        public Task<string> CreateCustomApiAsync(CustomApiRegistrationDetails details)
+        {
+            var body = BuildCustomApiBody(details, includeImmutableFields: true);
+            return CreateRecordAsync("customapis", body, details.SolutionUniqueName);
+        }
+
+        /// <summary>UniqueName/BindingType/BoundEntityLogicalName/AllowedCustomProcessingStepType/IsFunction are omitted here even if changed — Dataverse rejects updates to them, matching the Plugin Registration Tool's own restriction.</summary>
+        public Task UpdateCustomApiAsync(string customApiId, CustomApiRegistrationDetails details)
+        {
+            var body = BuildCustomApiBody(details, includeImmutableFields: false);
+            return UpdateRecordAsync("customapis", customApiId, body, details.SolutionUniqueName);
+        }
+
+        public Task DeleteCustomApiAsync(string customApiId) => DeleteRecordAsync("customapis", customApiId);
+
+        private static Dictionary<string, object> BuildCustomApiBody(CustomApiRegistrationDetails details, bool includeImmutableFields)
+        {
+            var body = new Dictionary<string, object>
+            {
+                ["name"] = details.Name,
+                ["displayname"] = details.DisplayName,
+                ["description"] = details.Description,
+                ["isprivate"] = details.IsPrivate,
+                ["executeprivilegename"] = details.ExecutePrivilegeName,
+            };
+
+            if (includeImmutableFields)
+            {
+                body["uniquename"] = details.UniqueName;
+                body["bindingtype"] = details.BindingType;
+                body["allowedcustomprocessingsteptype"] = details.AllowedCustomProcessingStepType;
+                body["isfunction"] = details.IsFunction;
+
+                if (!string.IsNullOrEmpty(details.BoundEntityLogicalName))
+                {
+                    body["boundentitylogicalname"] = details.BoundEntityLogicalName;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(details.PluginTypeId))
+            {
+                body["PluginTypeId@odata.bind"] = $"/plugintypes({details.PluginTypeId})";
+            }
+
+            return body;
+        }
+
+        public async Task<List<CustomApiParameterDefinition>> GetCustomApiRequestParametersAsync(string customApiId)
+        {
+            var url = ApiUrl(
+                "customapirequestparameters",
+                "$select=customapirequestparameterid,uniquename,name,displayname,description,type,logicalentityname,isoptional",
+                $"$filter=_customapiid_value eq '{customApiId}'",
+                "$orderby=name");
+
+            var raw = await FetchPagedAsync<CustomApiRequestParameterDto>(url).ConfigureAwait(false);
+            return raw.Select(p => new CustomApiParameterDefinition
+            {
+                Id = p.CustomApiRequestParameterId,
+                UniqueName = p.UniqueName,
+                Name = p.Name,
+                DisplayName = p.DisplayName,
+                Description = p.Description,
+                TypeValue = p.Type,
+                Type = CustomApiOptionLabels.ParameterType(p.Type),
+                LogicalEntityName = p.LogicalEntityName,
+                IsRequestParameter = true,
+                IsOptional = p.IsOptional,
+            }).ToList();
+        }
+
+        public async Task<List<CustomApiParameterDefinition>> GetCustomApiResponsePropertiesAsync(string customApiId)
+        {
+            var url = ApiUrl(
+                "customapiresponseproperties",
+                "$select=customapiresponsepropertyid,uniquename,name,displayname,description,type,logicalentityname",
+                $"$filter=_customapiid_value eq '{customApiId}'",
+                "$orderby=name");
+
+            var raw = await FetchPagedAsync<CustomApiResponsePropertyDto>(url).ConfigureAwait(false);
+            return raw.Select(p => new CustomApiParameterDefinition
+            {
+                Id = p.CustomApiResponsePropertyId,
+                UniqueName = p.UniqueName,
+                Name = p.Name,
+                DisplayName = p.DisplayName,
+                Description = p.Description,
+                TypeValue = p.Type,
+                Type = CustomApiOptionLabels.ParameterType(p.Type),
+                LogicalEntityName = p.LogicalEntityName,
+                IsRequestParameter = false,
+            }).ToList();
+        }
+
+        public Task<string> CreateCustomApiRequestParameterAsync(string customApiId, CustomApiParameterRegistrationDetails details) =>
+            CreateRecordAsync("customapirequestparameters", BuildCustomApiParameterBody(details, includeImmutableFields: true, isRequestParameter: true, customApiId), null);
+
+        public Task UpdateCustomApiRequestParameterAsync(string parameterId, CustomApiParameterRegistrationDetails details) =>
+            UpdateRecordAsync("customapirequestparameters", parameterId, BuildCustomApiParameterBody(details, includeImmutableFields: false, isRequestParameter: true, null));
+
+        public Task DeleteCustomApiRequestParameterAsync(string parameterId) => DeleteRecordAsync("customapirequestparameters", parameterId);
+
+        public Task<string> CreateCustomApiResponsePropertyAsync(string customApiId, CustomApiParameterRegistrationDetails details) =>
+            CreateRecordAsync("customapiresponseproperties", BuildCustomApiParameterBody(details, includeImmutableFields: true, isRequestParameter: false, customApiId), null);
+
+        public Task UpdateCustomApiResponsePropertyAsync(string propertyId, CustomApiParameterRegistrationDetails details) =>
+            UpdateRecordAsync("customapiresponseproperties", propertyId, BuildCustomApiParameterBody(details, includeImmutableFields: false, isRequestParameter: false, null));
+
+        public Task DeleteCustomApiResponsePropertyAsync(string propertyId) => DeleteRecordAsync("customapiresponseproperties", propertyId);
+
+        /// <summary>Shared by both request-parameter and response-property create/update — identical body shape except customapiresponseproperty has no isoptional field at all, so it must never be sent for those.</summary>
+        private static Dictionary<string, object> BuildCustomApiParameterBody(CustomApiParameterRegistrationDetails details, bool includeImmutableFields, bool isRequestParameter, string customApiId)
+        {
+            var body = new Dictionary<string, object>
+            {
+                ["name"] = details.Name,
+                ["displayname"] = details.DisplayName,
+                ["description"] = details.Description,
+            };
+
+            if (includeImmutableFields)
+            {
+                body["uniquename"] = details.UniqueName;
+                body["type"] = details.Type;
+
+                if (isRequestParameter)
+                {
+                    body["isoptional"] = details.IsOptional;
+                }
+
+                if (!string.IsNullOrEmpty(details.LogicalEntityName))
+                {
+                    body["logicalentityname"] = details.LogicalEntityName;
+                }
+
+                if (!string.IsNullOrEmpty(customApiId))
+                {
+                    body["CustomAPIId@odata.bind"] = $"/customapis({customApiId})";
+                }
+            }
+
+            return body;
+        }
+
         /// <summary>Returns the solutions (from the same set GetSolutionsAsync returns) that contain the given plugin assembly.</summary>
         public Task<List<DataverseSolution>> GetSolutionsContainingPluginAssemblyAsync(string pluginAssemblyId) =>
             GetSolutionsContainingComponentAsync(pluginAssemblyId, componentType: 91); // Plugin Assembly

@@ -28,6 +28,8 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         public ObservableCollection<PluginAssemblyNodeViewModel> Assemblies { get; } = new ObservableCollection<PluginAssemblyNodeViewModel>();
         public ICollectionView AssembliesView { get; }
 
+        public ObservableCollection<CustomApiNodeViewModel> CustomApis { get; } = new ObservableCollection<CustomApiNodeViewModel>();
+
         private string _searchText = string.Empty;
         public string SearchText
         {
@@ -55,11 +57,18 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         private string _loadError;
         public string LoadError { get => _loadError; private set => SetProperty(ref _loadError, value); }
 
+        private bool _isLoadingCustomApis;
+        public bool IsLoadingCustomApis { get => _isLoadingCustomApis; private set => SetProperty(ref _isLoadingCustomApis, value); }
+
+        private string _customApisLoadError;
+        public string CustomApisLoadError { get => _customApisLoadError; private set => SetProperty(ref _customApisLoadError, value); }
+
         public ICommand ConnectCommand { get; }
         public ICommand RefreshCommand { get; }
         public ICommand ShowMenuCommand { get; }
         public ICommand ShowSolutionPickerCommand { get; }
         public ICommand ClearSolutionFilterCommand { get; }
+        public ICommand AddCustomApiCommand { get; }
         public ICommand PublishProjectCommand { get; }
 
         public PluginExplorerViewModel(ConnectionManager connectionManager, DataverseClient client, IUserPrompts prompts)
@@ -77,6 +86,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             ShowSolutionPickerCommand = new AsyncRelayCommand(ShowSolutionPickerAsync);
             ClearSolutionFilterCommand = new RelayCommand(_ => ClearSolutionFilter());
             PublishProjectCommand = new AsyncRelayCommand(PublishProjectAsync);
+            AddCustomApiCommand = new AsyncRelayCommand(AddCustomApiAsync);
 
             // See EntityExplorerViewModel's constructor for why this hops to the UI thread first.
             _connectionManager.ConnectionChanged += (_, __) =>
@@ -102,6 +112,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             if (IsConnected)
             {
                 RefreshAsync().FileAndForget("D365DeveloperTools/RefreshPluginAssemblies");
+                RefreshCustomApisAsync().FileAndForget("D365DeveloperTools/RefreshCustomApis");
             }
             else
             {
@@ -109,6 +120,27 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
                 _allAssemblies.Clear();
                 _solutionFilterIds = null;
                 SolutionFilterName = null;
+                CustomApis.Clear();
+            }
+        }
+
+        public async Task RefreshCustomApisAsync()
+        {
+            IsLoadingCustomApis = true;
+            CustomApisLoadError = null;
+            try
+            {
+                var apis = await _client.GetCustomApisAsync().ConfigureAwait(true);
+                CustomApis.Clear();
+                foreach (var api in apis) { CustomApis.Add(new CustomApiNodeViewModel(api, _client)); }
+            }
+            catch (Exception ex)
+            {
+                CustomApisLoadError = ex.Message;
+            }
+            finally
+            {
+                IsLoadingCustomApis = false;
             }
         }
 
@@ -372,6 +404,84 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         {
             var succeeded = await ImageEditorCommand.EditAsync(_client, _prompts, node.Image, node.Owner?.Step.PrimaryEntity).ConfigureAwait(true);
             if (succeeded && node.Owner != null) { await node.Owner.ReloadImagesAsync().ConfigureAwait(true); }
+        }
+
+        // ── Custom APIs ──────────────────────────────────────────────────────
+
+        public async Task AddCustomApiAsync()
+        {
+            var succeeded = await CustomApiEditorCommand.AddAsync(_client, _prompts).ConfigureAwait(true);
+            if (succeeded) { await RefreshCustomApisAsync().ConfigureAwait(true); }
+        }
+
+        public async Task EditCustomApiAsync(CustomApiNodeViewModel node)
+        {
+            var succeeded = await CustomApiEditorCommand.EditAsync(_client, _prompts, node.Api).ConfigureAwait(true);
+            if (!succeeded) { return; }
+
+            // A full reload (rather than patching this one node in place) picks up the server-computed
+            // labels for any fields the dialog changed, same reasoning as re-fetching after a step edit.
+            await RefreshCustomApisAsync().ConfigureAwait(true);
+        }
+
+        public async Task DeleteCustomApiAsync(CustomApiNodeViewModel node)
+        {
+            var confirmed = await _prompts.ConfirmAsync("D365: Unregister Custom API", $"Unregister '{node.Name}'? This can't be undone.").ConfigureAwait(true);
+            if (!confirmed) { return; }
+
+            try
+            {
+                await _client.DeleteCustomApiAsync(node.Api.CustomApiId).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                _prompts.ShowError($"D365: Failed to unregister the Custom API: {ex.Message}");
+                return;
+            }
+
+            CustomApis.Remove(node);
+            _prompts.ShowInfo($"D365: Unregistered '{node.Name}'.");
+        }
+
+        /// <summary>Registers a new request parameter or response property on a Custom API found in this tree.</summary>
+        public async Task AddCustomApiParameterAsync(CustomApiNodeViewModel node, bool isRequestParameter)
+        {
+            var succeeded = await CustomApiParameterEditorCommand.AddAsync(_client, _prompts, node.Api.CustomApiId, isRequestParameter).ConfigureAwait(true);
+            if (succeeded) { await node.ReloadParametersAsync().ConfigureAwait(true); }
+        }
+
+        /// <summary>Edits an already-registered request parameter or response property found in this tree.</summary>
+        public async Task EditCustomApiParameterAsync(CustomApiParameterNodeViewModel node)
+        {
+            var succeeded = await CustomApiParameterEditorCommand.EditAsync(_client, _prompts, node.Parameter).ConfigureAwait(true);
+            if (succeeded && node.Owner != null) { await node.Owner.ReloadParametersAsync().ConfigureAwait(true); }
+        }
+
+        public async Task DeleteCustomApiParameterAsync(CustomApiParameterNodeViewModel node)
+        {
+            var kind = node.IsRequestParameter ? "Request Parameter" : "Response Property";
+            var confirmed = await _prompts.ConfirmAsync($"D365: Unregister {kind}", $"Unregister '{node.Name}'? This can't be undone.").ConfigureAwait(true);
+            if (!confirmed) { return; }
+
+            try
+            {
+                if (node.IsRequestParameter)
+                {
+                    await _client.DeleteCustomApiRequestParameterAsync(node.Parameter.Id).ConfigureAwait(true);
+                }
+                else
+                {
+                    await _client.DeleteCustomApiResponsePropertyAsync(node.Parameter.Id).ConfigureAwait(true);
+                }
+            }
+            catch (Exception ex)
+            {
+                _prompts.ShowError($"D365: Failed to unregister '{node.Name}': {ex.Message}");
+                return;
+            }
+
+            if (node.Owner != null) { await node.Owner.ReloadParametersAsync().ConfigureAwait(true); }
+            _prompts.ShowInfo($"D365: Unregistered '{node.Name}'.");
         }
     }
 }

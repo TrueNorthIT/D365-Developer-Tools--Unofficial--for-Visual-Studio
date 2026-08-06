@@ -41,6 +41,16 @@
             <MenuItem Header="Edit Image..." Click="OnEditImageClick" />
             <MenuItem Header="Unregister..." Click="OnUnregisterImageClick" />
         </ContextMenu>
+        <ContextMenu x:Key="CustomApiContextMenu">
+            <MenuItem Header="Edit Custom API..." Click="OnEditCustomApiClick" />
+            <MenuItem Header="Add Request Parameter..." Click="OnAddCustomApiRequestParameterClick" />
+            <MenuItem Header="Add Response Property..." Click="OnAddCustomApiResponsePropertyClick" />
+            <MenuItem Header="Unregister..." Click="OnUnregisterCustomApiClick" />
+        </ContextMenu>
+        <ContextMenu x:Key="CustomApiParameterContextMenu">
+            <MenuItem Header="Edit..." Click="OnEditCustomApiParameterClick" />
+            <MenuItem Header="Unregister..." Click="OnUnregisterCustomApiParameterClick" />
+        </ContextMenu>
 
         <DataTemplate x:Key="ImageTemplate">
             <Grid Margin="0,1" ContextMenu="{StaticResource ImageContextMenu}">
@@ -102,6 +112,41 @@
                                Visibility="{Binding HasPackage, Converter={StaticResource BoolToVisibleConverter}}" />
                     <TextBlock Margin="6,0,0,0" Opacity="0.6" FontSize="11" Text="{Binding Version}" />
                     <TextBlock Margin="6,0,0,0" Opacity="0.6" FontSize="11" Text="{Binding IsolationMode}" />
+                </StackPanel>
+            </Grid>
+        </HierarchicalDataTemplate>
+
+        <DataTemplate x:Key="CustomApiParameterTemplate">
+            <Grid Margin="0,1" ContextMenu="{StaticResource CustomApiParameterContextMenu}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Background="#332D7DD2" CornerRadius="2" Padding="3,0" Margin="0,0,4,0">
+                    <TextBlock FontSize="10" Text="{Binding Kind}" />
+                </Border>
+                <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="2" Margin="6,0" Opacity="0.6" FontSize="10" Text="(optional)"
+                           Visibility="{Binding IsOptional, Converter={StaticResource BoolToVisibleConverter}}" />
+                <TextBlock Grid.Column="3" Margin="6,0,0,0" Opacity="0.6" FontSize="10" Text="{Binding Type}" />
+            </Grid>
+        </DataTemplate>
+
+        <HierarchicalDataTemplate x:Key="CustomApiTemplate" ItemsSource="{Binding Parameters}" ItemTemplate="{StaticResource CustomApiParameterTemplate}">
+            <Grid Margin="0,2" ContextMenu="{StaticResource CustomApiContextMenu}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <img:CrispImage Grid.Column="0" Width="16" Height="16" Margin="0,0,4,0" VerticalAlignment="Center" Moniker="{x:Static catalog:KnownMonikers.WebService}" />
+                <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="Bold" TextTrimming="CharacterEllipsis" ToolTip="{Binding UniqueName}" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <TextBlock Margin="6,0,0,0" Opacity="0.6" FontSize="11" Text="{Binding BindingType}" />
+                    <TextBlock Margin="6,0,0,0" Opacity="0.6" FontSize="11" Text="Function"
+                               Visibility="{Binding IsFunction, Converter={StaticResource BoolToVisibleConverter}}" />
                 </StackPanel>
             </Grid>
         </HierarchicalDataTemplate>
@@ -171,7 +216,9 @@
             <Grid Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibleConverter}}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
+                    <RowDefinition Height="2*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="1*" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Margin="8,4" TextWrapping="Wrap"
@@ -187,6 +234,37 @@
                         </Style>
                     </TreeView.ItemContainerStyle>
                 </TreeView>
+
+                <!-- Custom APIs: a separate top-level section, not owned by any one assembly. -->
+                <Grid Grid.Row="2" Margin="0,8,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Margin="8,0" VerticalAlignment="Center" FontWeight="Bold" Text="Custom APIs" />
+                    <Button Grid.Column="1" Content="Add Custom API..." Command="{Binding AddCustomApiCommand}" Padding="4,2" />
+                </Grid>
+
+                <Grid Grid.Row="3">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Margin="8,4" TextWrapping="Wrap"
+                               Foreground="{DynamicResource {x:Static vsp:EnvironmentColors.ToolWindowValidationErrorTextBrushKey}}"
+                               Text="{Binding CustomApisLoadError}" Visibility="{Binding CustomApisLoadError, Converter={StaticResource EmptyToCollapsedConverter}}" />
+                    <TextBlock Grid.Row="0" Margin="8,4" Text="Loading Custom APIs…"
+                               Visibility="{Binding IsLoadingCustomApis, Converter={StaticResource BoolToVisibleConverter}}" />
+
+                    <TreeView x:Name="CustomApiTree" Grid.Row="1" ItemsSource="{Binding CustomApis}" ItemTemplate="{StaticResource CustomApiTemplate}">
+                        <TreeView.ItemContainerStyle>
+                            <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
+                                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                            </Style>
+                        </TreeView.ItemContainerStyle>
+                    </TreeView>
+                </Grid>
             </Grid>
         </Grid>
     </Grid>
