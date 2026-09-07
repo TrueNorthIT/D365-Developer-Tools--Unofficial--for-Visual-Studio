@@ -10,6 +10,7 @@ using D365_Developer_Tools__Unofficial__for_Visual_Studio.Mcp;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Dialogs;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows;
+using D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewModels;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
@@ -30,6 +31,10 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
     [Guid(PackageGuids.D365DeveloperToolsPackageString)]
     [ProvideToolWindow(typeof(EntityExplorerToolWindow), Style = VsDockStyle.Tabbed, Window = ToolWindowGuids80.SolutionExplorer)]
     [ProvideToolWindow(typeof(PluginExplorerToolWindow), Style = VsDockStyle.Tabbed, Window = ToolWindowGuids80.SolutionExplorer)]
+    // Float (not Tabbed alongside Solution Explorer, unlike the other two tool windows) — a trace log
+    // grid benefits from its own detached window rather than competing for sidebar space. Only sets the
+    // *first-ever* placement; VS remembers wherever the user docks/moves/resizes it after that.
+    [ProvideToolWindow(typeof(PluginDebuggingToolWindow), Style = VsDockStyle.Float, Width = 700, Height = 500)]
     [ProvideMenuResource("Menus.ctmenu", 1)]
     [ProvideAutoLoad(UIContextGuids80.NoSolution, PackageAutoLoadFlags.BackgroundLoad)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.SolutionExists_string, PackageAutoLoadFlags.BackgroundLoad)]
@@ -48,6 +53,13 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
         internal ConnectionManager ConnectionManager { get; private set; }
         internal DataverseClient DataverseClient { get; private set; }
         internal IUserPrompts UserPrompts { get; private set; }
+
+        /// <summary>
+        /// A singleton (unlike PluginExplorerViewModel, which PluginExplorerToolWindow builds fresh
+        /// per Initialize()) — ViewStepTraceLogsCommand needs to push a step filter into this ViewModel
+        /// whether or not the Plugin Debugging tool window is already open.
+        /// </summary>
+        internal PluginDebuggingViewModel PluginDebuggingViewModel { get; private set; }
 
         private McpBridge _mcpBridge;
 
@@ -104,6 +116,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
                 UserPrompts = new WpfUserPrompts();
                 ConnectionManager = new ConnectionManager(UserPrompts, _solutionContext);
                 DataverseClient = new DataverseClient(ConnectionManager);
+                PluginDebuggingViewModel = new PluginDebuggingViewModel(ConnectionManager, DataverseClient, UserPrompts);
 
                 _mcpBridge = new McpBridge(ConnectionManager, UserPrompts);
                 ConnectionManager.ConnectionChanged += (_, connection) =>
@@ -164,6 +177,35 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
             if (window?.Frame == null)
             {
                 throw new NotSupportedException("Cannot create the D365 Plugin Explorer tool window.");
+            }
+        }
+
+        /// <summary>Public wrapper around the protected AsyncPackage.ShowToolWindowAsync, for the Extensibility-model commands and ViewStepTraceLogsCommand.</summary>
+        /// <summary>
+        /// Set once the first time this successfully floats the Plugin Debugging window (see below) —
+        /// guards against re-forcing it to float on every later Show, once the user has redocked it themselves.
+        /// </summary>
+        private bool _pluginDebuggingWindowPositioned;
+
+        internal async Task ShowPluginDebuggingToolWindowAsync()
+        {
+            var window = await ShowToolWindowAsync(typeof(PluginDebuggingToolWindow), 0, create: true, cancellationToken: DisposalToken).ConfigureAwait(true);
+            if (window?.Frame == null)
+            {
+                throw new NotSupportedException("Cannot create the D365 Plugin Debugging tool window.");
+            }
+
+            // [ProvideToolWindow(Style = VsDockStyle.Float)] on this window only reliably applies when
+            // it's shown from a "neutral" context (e.g. the Tools menu) — showing it for the first time
+            // from inside Plugin Explorer's own step context menu (ViewStepTraceLogsCommand) instead
+            // docks it tabbed alongside whatever tool window is currently active, ignoring the
+            // attribute. Forcing it to float explicitly here, once, makes the first-ever placement
+            // consistent regardless of which entry point creates it first.
+            if (!_pluginDebuggingWindowPositioned && window.Frame is IVsWindowFrame frame)
+            {
+                _pluginDebuggingWindowPositioned = true;
+                var relativeId = Guid.Empty;
+                frame.SetFramePos(VSSETFRAMEPOS.SFP_fFloat, ref relativeId, 0, 0, 700, 500);
             }
         }
 
@@ -263,6 +305,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio
             if (disposing)
             {
                 _mcpBridge?.Dispose();
+                PluginDebuggingViewModel?.StopAutoRefresh();
                 ConnectionManager?.Dispose();
                 if (_solutionContext != null && ThreadHelper.CheckAccess())
                 {

@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewModels;
 using Microsoft.VisualStudio.Shell;
 
@@ -60,6 +61,17 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows
             if (TryGetRowDataContext<SdkMessageStepImageNodeViewModel>(sender, out var node))
             {
                 ViewModel.EditImageAsync(node).FileAndForget("D365DeveloperTools/PluginExplorerEditImage");
+            }
+        }
+
+        private void OnViewStepTraceLogsClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<SdkMessageStepNodeViewModel>(sender, out var node))
+            {
+                // node.Owner.Name is the owning PluginTypeNodeViewModel's fully-qualified type name
+                // (PluginTypeDefinition.TypeName) — see ViewStepTraceLogsCommand for why plugintracelog
+                // needs that instead of the step's own ID.
+                ViewStepTraceLogsCommand.ExecuteAsync(node.Step, node.Owner?.Name, node.PluginTypeFriendlyName).FileAndForget("D365DeveloperTools/ViewStepTraceLogs");
             }
         }
 

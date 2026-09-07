@@ -92,6 +92,76 @@
         <Setter Property="BorderThickness" Value="0" />
     </Style>
 
+    <!-- First use of DataGrid in this extension (Plugin Debugging's trace log grid) — every other
+         list surface (Entity Explorer, Plugin Explorer) is a TreeView. Mirrors the TreeView/TreeViewItem
+         selection-brush pattern above, plus HeaderColors for the column headers. -->
+    <Style TargetType="{x:Type DataGrid}">
+        <Setter Property="Background" Value="{DynamicResource {x:Static vsp:TreeViewColors.BackgroundBrushKey}}" />
+        <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:TreeViewColors.BackgroundTextBrushKey}}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="RowBackground" Value="Transparent" />
+        <Setter Property="AlternatingRowBackground" Value="Transparent" />
+        <Setter Property="GridLinesVisibility" Value="Horizontal" />
+        <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource {x:Static vsp:CommonControlsColors.ButtonBorderBrushKey}}" />
+        <Setter Property="HeadersVisibility" Value="Column" />
+        <Setter Property="AutoGenerateColumns" Value="False" />
+        <Setter Property="CanUserAddRows" Value="False" />
+        <Setter Property="CanUserDeleteRows" Value="False" />
+        <Setter Property="IsReadOnly" Value="True" />
+    </Style>
+
+    <Style TargetType="{x:Type DataGridColumnHeader}">
+        <Setter Property="Background" Value="{DynamicResource {x:Static vsp:HeaderColors.DefaultBrushKey}}" />
+        <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:HeaderColors.DefaultTextBrushKey}}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource {x:Static vsp:HeaderColors.SeparatorLineBrushKey}}" />
+        <Setter Property="BorderThickness" Value="0,0,1,1" />
+        <Setter Property="Padding" Value="6,3" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource {x:Static vsp:HeaderColors.MouseOverBrushKey}}" />
+                <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:HeaderColors.MouseOverTextBrushKey}}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style TargetType="{x:Type DataGridRow}">
+        <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:TreeViewColors.BackgroundTextBrushKey}}" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource {x:Static vsp:TreeViewColors.DragOverItemBrushKey}}" />
+            </Trigger>
+            <!-- DataGridRow has no IsSelectionActive property of its own (unlike TreeViewItem/ListBoxItem
+                 above) — it relies on the attached Selector.IsSelectionActive from the hosting DataGrid. -->
+            <MultiTrigger>
+                <MultiTrigger.Conditions>
+                    <Condition Property="IsSelected" Value="True" />
+                    <Condition Property="Selector.IsSelectionActive" Value="True" />
+                </MultiTrigger.Conditions>
+                <Setter Property="Background" Value="{DynamicResource {x:Static vsp:TreeViewColors.SelectedItemActiveBrushKey}}" />
+                <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:TreeViewColors.SelectedItemActiveTextBrushKey}}" />
+            </MultiTrigger>
+            <MultiTrigger>
+                <MultiTrigger.Conditions>
+                    <Condition Property="IsSelected" Value="True" />
+                    <Condition Property="Selector.IsSelectionActive" Value="False" />
+                </MultiTrigger.Conditions>
+                <Setter Property="Background" Value="{DynamicResource {x:Static vsp:TreeViewColors.SelectedItemInactiveBrushKey}}" />
+                <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:TreeViewColors.SelectedItemInactiveTextBrushKey}}" />
+            </MultiTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style TargetType="{x:Type DataGridCell}">
+        <Setter Property="Padding" Value="6,3" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Style.Triggers>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="Transparent" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <Style TargetType="{x:Type TreeViewItem}">
         <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:TreeViewColors.BackgroundTextBrushKey}}" />
         <Style.Triggers>

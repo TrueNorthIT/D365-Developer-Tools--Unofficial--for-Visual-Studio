@@ -822,6 +822,92 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
             using (await SendAsync(url, HttpMethod.Delete, null, null, HttpStatusCode.NotFound).ConfigureAwait(false)) { }
         }
 
+        // ── Plugin trace logs ────────────────────────────────────────────────
+
+        /// <summary>
+        /// Queries plugintracelogs for one bounded, newest-first page. Deliberately does NOT use
+        /// FetchPagedAsync&lt;T&gt; — that follows every @odata.nextLink unconditionally, which is fine
+        /// for bounded metadata sets but would hang the UI against a busy org's trace log table.
+        /// filter.Top caps the page size instead; PluginTraceLogPage.NextLink is retained for a future
+        /// "Load more" affordance, not wired into the v1 UI.
+        /// </summary>
+        public async Task<PluginTraceLogPage> GetPluginTraceLogsAsync(PluginTraceLogFilter filter)
+        {
+            var filters = new List<string>();
+
+            // plugintracelog.typename is confirmed (against a live environment) to hold the *assembly-
+            // qualified* type name ("Namespace.Class, AssemblyName, Version=..., Culture=..., PublicKeyToken=...")
+            // — not the bare class name plugintype.typename holds (what Plugin Explorer surfaces). An
+            // eq comparison against the bare name therefore never matches; startswith against the bare
+            // name plus a trailing ", " anchors it as an exact type-name prefix rather than a fuzzy
+            // substring match. Dataverse's Web API supports startswith/contains/endswith in $filter
+            // (unlike tolower/toupper/etc., which it doesn't), so this doesn't need a client-side fallback.
+            if (!string.IsNullOrEmpty(filter.TypeName)) { filters.Add($"startswith(typename,'{EscapeODataLiteral(filter.TypeName)}, ')"); }
+            if (!string.IsNullOrEmpty(filter.PrimaryEntity)) { filters.Add($"primaryentity eq '{EscapeODataLiteral(filter.PrimaryEntity)}'"); }
+            if (!string.IsNullOrEmpty(filter.MessageName)) { filters.Add($"messagename eq '{EscapeODataLiteral(filter.MessageName)}'"); }
+            if (!string.IsNullOrEmpty(filter.CorrelationId)) { filters.Add($"correlationid eq '{filter.CorrelationId}'"); }
+            if (filter.From.HasValue) { filters.Add($"createdon ge {filter.From.Value:yyyy-MM-ddTHH:mm:ssZ}"); }
+            if (filter.To.HasValue) { filters.Add($"createdon le {filter.To.Value:yyyy-MM-ddTHH:mm:ssZ}"); }
+            if (filter.ExceptionsOnly) { filters.Add("exceptiondetails ne null"); }
+
+            var queryParts = new List<string>
+            {
+                "$select=plugintracelogid,typename,messagename,primaryentity,performanceexecutionduration," +
+                    "exceptiondetails,messageblock,createdon,correlationid,depth,mode,operationtype," +
+                    "persistencekey",
+                "$orderby=createdon desc",
+                $"$top={filter.Top}",
+            };
+            if (filters.Count > 0) { queryParts.Add($"$filter={string.Join(" and ", filters)}"); }
+
+            var url = ApiUrl("plugintracelogs", queryParts.ToArray());
+
+            // A direct RequestAsync (not FetchPagedAsync) — see the method summary above.
+            var page = await RequestAsync<ODataResponse<PluginTraceLogDto>>(url).ConfigureAwait(false);
+
+            return new PluginTraceLogPage
+            {
+                Items = (page?.Value ?? new List<PluginTraceLogDto>()).Select(MapTraceLog).ToList(),
+                NextLink = page?.NextLink,
+            };
+        }
+
+        private static PluginTraceLogEntry MapTraceLog(PluginTraceLogDto t) => new PluginTraceLogEntry
+        {
+            TraceLogId = t.PluginTraceLogId,
+            TypeName = t.TypeName,
+            MessageName = t.MessageName,
+            PrimaryEntity = t.PrimaryEntity,
+            PerformanceExecutionDuration = t.PerformanceExecutionDuration,
+            ExceptionDetails = t.ExceptionDetails,
+            MessageBlock = t.MessageBlock,
+            CreatedOn = t.CreatedOn,
+            CorrelationId = t.CorrelationId,
+            Depth = t.Depth,
+            ModeValue = t.Mode,
+            Mode = PluginOptionLabels.Mode(t.Mode),
+            OperationTypeValue = t.OperationType,
+            OperationType = PluginOptionLabels.OperationType(t.OperationType),
+            PersistenceKey = t.PersistenceKey,
+            HasProfilingData = !string.IsNullOrEmpty(t.PersistenceKey),
+        };
+
+        /// <summary>Reads the org's tracing level so the UI can warn "tracing is off" instead of showing a confusing empty list.</summary>
+        public async Task<PluginTraceLogSettingsInfo> GetPluginTraceLogSettingAsync()
+        {
+            var orgId = _connectionManager.Connection.WhoAmI.OrganizationId;
+            var url = $"{RecordUrl("organizations", orgId)}?$select=organizationid,plugintracelogsetting";
+            var org = await RequestAsync<OrganizationTraceSettingDto>(url).ConfigureAwait(false);
+
+            return org == null
+                ? null
+                : new PluginTraceLogSettingsInfo { OrganizationId = org.OrganizationId, Setting = (PluginTraceLogSetting)org.PluginTraceLogSetting };
+        }
+
+        /// <summary>Changes the org-wide tracing level — the same write the Plugin Registration Tool's "Settings" dialog performs.</summary>
+        public Task SetPluginTraceLogSettingAsync(string organizationId, PluginTraceLogSetting setting) =>
+            UpdateRecordAsync("organizations", organizationId, new { plugintracelogsetting = (int)setting });
+
         // ── Internals ────────────────────────────────────────────────────────
 
         private string ApiUrl(string resource, params string[] queryParts)
