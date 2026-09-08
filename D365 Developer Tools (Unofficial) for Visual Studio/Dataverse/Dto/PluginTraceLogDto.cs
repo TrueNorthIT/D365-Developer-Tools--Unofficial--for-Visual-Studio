@@ -17,7 +17,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse.Dto
         public int Mode { get; set; }
         public int OperationType { get; set; }
 
-        /// <summary>Never $select the actual profilingdata blob content in v1 — this DTO doesn't carry it.</summary>
+        /// <summary>Not a reliable signal for capture presence — see PluginTraceLogEntry.PersistenceKey's doc comment. Never $select the actual `profile` blob content here — this DTO backs the bounded list query, not the on-demand full-capture fetch.</summary>
         public string PersistenceKey { get; set; }
     }
 
@@ -26,5 +26,12 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse.Dto
     {
         public string OrganizationId { get; set; }
         public int PluginTraceLogSetting { get; set; }
+    }
+
+    /// <summary>Wire shape for the on-demand full-capture fetch (GetPluginTraceLogCaptureAsync) — deliberately separate from PluginTraceLogDto, which never selects these two (potentially large) fields.</summary>
+    internal sealed class PluginTraceLogCaptureDto
+    {
+        public string Profile { get; set; }
+        public string SecureConfiguration { get; set; }
     }
 }

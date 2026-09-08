@@ -75,6 +75,16 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows
             }
         }
 
+        private void OnDebugStepClick(object sender, RoutedEventArgs e)
+        {
+            if (TryGetRowDataContext<SdkMessageStepNodeViewModel>(sender, out var node))
+            {
+                // See OnViewStepTraceLogsClick above for why node.Owner?.Name (not the step's own ID) is
+                // what plugintracelog can actually be filtered by.
+                DebugStepCommand.ExecuteAsync(node.Step, node.Owner?.Name, node.PluginTypeFriendlyName).FileAndForget("D365DeveloperTools/DebugStep");
+            }
+        }
+
         private void OnEditAssemblyDescriptionClick(object sender, RoutedEventArgs e)
         {
             if (TryGetRowDataContext<PluginAssemblyNodeViewModel>(sender, out var node))

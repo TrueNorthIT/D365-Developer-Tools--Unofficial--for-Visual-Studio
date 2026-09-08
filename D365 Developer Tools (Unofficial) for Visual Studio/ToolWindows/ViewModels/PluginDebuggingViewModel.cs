@@ -9,6 +9,7 @@ using System.Windows.Threading;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Connection;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse;
+using D365_Developer_Tools__Unofficial__for_Visual_Studio.PluginDebugging;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Mvvm;
 using Microsoft.VisualStudio.Shell;
@@ -70,6 +71,18 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             set
             {
                 if (SetProperty(ref _exceptionsOnly, value)) { RefreshAsync().FileAndForget("D365DeveloperTools/RefreshTraceLogsAfterExceptionsOnlyToggle"); }
+            }
+        }
+
+        private bool _hasCapturedProfileOnly;
+
+        /// <summary>Narrows to rows with a replayable capture (plugintracelog.profile ne null) — see PluginTraceLogFilter.HasCapturedProfile's doc comment for why this, not PersistenceKey/HasProfilingData, is the correct signal.</summary>
+        public bool HasCapturedProfileOnly
+        {
+            get => _hasCapturedProfileOnly;
+            set
+            {
+                if (SetProperty(ref _hasCapturedProfileOnly, value)) { RefreshAsync().FileAndForget("D365DeveloperTools/RefreshTraceLogsAfterHasCapturedProfileToggle"); }
             }
         }
 
@@ -135,11 +148,20 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             }
         }
 
+        private DebugSessionInfo _debugSession;
+
+        /// <summary>Non-null for the lifetime of one "Debug This" run — backs PluginDebuggingControl's non-modal session status strip.</summary>
+        public DebugSessionInfo DebugSession { get => _debugSession; private set => SetProperty(ref _debugSession, value); }
+
+        private System.Diagnostics.Process _debugProcess;
+
         public ICommand ConnectCommand { get; }
         public ICommand RefreshCommand { get; }
         public ICommand ShowMenuCommand { get; }
         public ICommand ClearStepFilterCommand { get; }
         public ICommand EnableTracingCommand { get; }
+        public ICommand DebugCommand { get; }
+        public ICommand StopDebugSessionCommand { get; }
 
         public PluginDebuggingViewModel(ConnectionManager connectionManager, DataverseClient client, IUserPrompts prompts)
         {
@@ -161,6 +183,10 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             ShowMenuCommand = new AsyncRelayCommand(() => ConnectionMenu.ShowAsync(_connectionManager, _prompts));
             ClearStepFilterCommand = new RelayCommand(_ => ClearStepFilter());
             EnableTracingCommand = new AsyncRelayCommand(EnableTracingAsync);
+            DebugCommand = new AsyncRelayCommand(
+                () => DebugPluginCaptureCommand.ExecuteAsync(SelectedEntry),
+                () => SelectedEntry != null && DebugSession == null);
+            StopDebugSessionCommand = new RelayCommand(_ => StopDebugSession(), _ => DebugSession != null);
 
             // See EntityExplorerViewModel's constructor for why this hops to the UI thread first.
             _connectionManager.ConnectionChanged += (_, __) =>
@@ -206,11 +232,17 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         /// feature has the most confidence in, and the user can still narrow further by hand using the
         /// regular Entity/Message boxes plus Refresh if they want tighter matching.
         /// </summary>
-        public async Task LoadForStepAsync(string pluginTypeName, string stepLabel)
+        public async Task LoadForStepAsync(string pluginTypeName, string stepLabel, bool requireCapturedProfile = false)
         {
             _stepFilterTypeName = pluginTypeName;
             StepFilterLabel = stepLabel;
             OnPropertyChanged(nameof(HasStepFilter));
+
+            // Setting this (rather than passing it straight into RefreshAsync's own filter) so the
+            // checkbox in PluginDebuggingControl reflects it too — "Debug This Step..." arms a capture
+            // and this filter is exactly what finds it once triggered.
+            if (requireCapturedProfile) { _hasCapturedProfileOnly = true; OnPropertyChanged(nameof(HasCapturedProfileOnly)); }
+
             await RefreshAsync().ConfigureAwait(true);
         }
 
@@ -243,6 +275,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
                     PrimaryEntity = string.IsNullOrWhiteSpace(EntityFilter) ? null : EntityFilter.Trim(),
                     MessageName = string.IsNullOrWhiteSpace(MessageFilter) ? null : MessageFilter.Trim(),
                     ExceptionsOnly = ExceptionsOnly,
+                    HasCapturedProfile = HasCapturedProfileOnly,
                     From = FromDate,
                     To = ToDate,
                 };
@@ -337,6 +370,39 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         public void StopAutoRefresh()
         {
             IsAutoRefreshEnabled = false;
+        }
+
+        // ── Debug session tracking — DebugPluginCaptureCommand drives these; this ViewModel only
+        // tracks state for the status strip and the Stop button, it never launches anything itself. ──
+
+        public void BeginDebugSession(string label)
+        {
+            _debugProcess = null;
+            DebugSession = new DebugSessionInfo { Label = label, StartedAtUtc = DateTime.UtcNow, StatusText = "Starting…" };
+        }
+
+        public void OnDebugProcessAttached(System.Diagnostics.Process process)
+        {
+            _debugProcess = process;
+            if (DebugSession != null) { DebugSession.StatusText = $"Attached (PID {process.Id}) — debugging"; }
+        }
+
+        public void EndDebugSession()
+        {
+            _debugProcess = null;
+            DebugSession = null;
+        }
+
+        private void StopDebugSession()
+        {
+            try
+            {
+                if (_debugProcess != null && !_debugProcess.HasExited) { _debugProcess.Kill(); }
+            }
+            catch
+            {
+                // Best-effort — the process may already have exited between the check above and the kill.
+            }
         }
     }
 }

@@ -76,10 +76,13 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <CheckBox Grid.Column="0" Content="Exceptions only" VerticalAlignment="Center" IsChecked="{Binding ExceptionsOnly}" />
-                <CheckBox Grid.Column="1" Content="Auto-refresh" Margin="0,0,8,0" VerticalAlignment="Center" IsChecked="{Binding IsAutoRefreshEnabled}" />
-                <Button Grid.Column="2" Content="Refresh" Command="{Binding RefreshCommand}" Padding="8,3" />
+                <CheckBox Grid.Column="1" Content="Has capture" Margin="0,0,8,0" VerticalAlignment="Center" IsChecked="{Binding HasCapturedProfileOnly}"
+                          ToolTip="Only show rows with a captured execution ready to debug (plugintracelog.profile populated)." />
+                <CheckBox Grid.Column="2" Content="Auto-refresh" Margin="0,0,8,0" VerticalAlignment="Center" IsChecked="{Binding IsAutoRefreshEnabled}" />
+                <Button Grid.Column="3" Content="Refresh" Command="{Binding RefreshCommand}" Padding="8,3" />
             </Grid>
 
             <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Padding="3" ToolTip="Search loaded results (type/trace text/exception)…" />
@@ -145,6 +148,22 @@
                     <TextBox Margin="8,0,8,4" FontSize="10" Opacity="0.7" IsReadOnly="True" BorderThickness="0" Background="Transparent"
                              TextWrapping="Wrap" Text="{Binding LastQueryDescription, Mode=OneWay}"
                              Visibility="{Binding LastQueryDescription, Converter={StaticResource EmptyToCollapsedConverter}}" />
+
+                    <!-- Non-modal debug session status strip — set for the lifetime of one "Debug This" run. -->
+                    <Border Margin="8,0,8,4" Padding="6,4" Background="#332D7DD2" CornerRadius="2"
+                            Visibility="{Binding DebugSession, Converter={StaticResource NullToVisibleConverter}}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock FontSize="11" FontWeight="Bold" Text="{Binding DebugSession.Label}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock FontSize="11" Text="{Binding DebugSession.StatusText}" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Stop" Padding="8,3" VerticalAlignment="Center" Command="{Binding StopDebugSessionCommand}" />
+                        </Grid>
+                    </Border>
                 </StackPanel>
 
                 <DataGrid Grid.Row="1" ItemsSource="{Binding EntriesView}" SelectedItem="{Binding SelectedEntry, Mode=TwoWay}">
@@ -177,7 +196,15 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" Margin="8,0,8,2" FontWeight="Bold" Text="Trace" />
+                    <Grid Grid.Row="0" Margin="8,0,8,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" FontWeight="Bold" Text="Trace" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Content="Debug This" Padding="8,3" Command="{Binding DebugCommand}"
+                                ToolTip="Replay this captured execution locally with real breakpoints — see the Plugin Debugging Phase 2 plan." />
+                    </Grid>
                     <!-- Plain monospace, no XML/JSON pretty-printing — ITracingService.Trace text isn't guaranteed structured. -->
                     <TextBox Grid.Row="1" Margin="8,0" IsReadOnly="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                              FontFamily="Consolas" Text="{Binding SelectedEntry.MessageBlock, Mode=OneWay}" />

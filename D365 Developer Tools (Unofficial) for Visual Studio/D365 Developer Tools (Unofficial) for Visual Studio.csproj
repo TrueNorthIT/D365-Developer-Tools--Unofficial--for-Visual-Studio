@@ -145,4 +145,28 @@
     </ItemGroup>
   </Target>
 
+  <!-- Plugin Debugging's isolated replay host — see D365DebugHost's own csproj comment for why it's a
+       second, separate bundled process (net472/x64, unlike the MCP server's net10.0) rather than
+       something loaded in-process. Same bundling mechanism as PublishMcpServer above: Publish (not
+       ProjectReference) so VSSDK's Content-item globbing can see the output. Unlike the MCP server,
+       SelfContained/RuntimeIdentifier aren't applicable to a classic .NET Framework Publish at all, so
+       they're simply omitted rather than set false. -->
+  <PropertyGroup>
+    <_DebugHostProject>$(MSBuildThisFileDirectory)..\D365 Developer Tools (Unofficial) for Visual Studio.DebugHost\D365 Developer Tools (Unofficial) for Visual Studio.DebugHost.csproj</_DebugHostProject>
+    <_DebugHostPublishDir>$(MSBuildThisFileDirectory)$(BaseIntermediateOutputPath)DebugHostPublish\</_DebugHostPublishDir>
+  </PropertyGroup>
+
+  <Target Name="PublishDebugHost" BeforeTargets="GetVsixSourceItems" Condition="Exists('$(_DebugHostProject)')">
+    <MSBuild Projects="$(_DebugHostProject)" Targets="Restore;Publish"
+             Properties="Configuration=$(Configuration);PublishDir=$(_DebugHostPublishDir)" />
+    <ItemGroup>
+      <_DebugHostFile Include="$(_DebugHostPublishDir)**\*.*" />
+      <Content Include="@(_DebugHostFile)">
+        <Link>DebugHost\%(RecursiveDir)%(Filename)%(Extension)</Link>
+        <IncludeInVSIX>true</IncludeInVSIX>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+  </Target>
+
 </Project>

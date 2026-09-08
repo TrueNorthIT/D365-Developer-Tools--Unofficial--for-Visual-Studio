@@ -850,6 +850,11 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
             if (filter.To.HasValue) { filters.Add($"createdon le {filter.To.Value:yyyy-MM-ddTHH:mm:ssZ}"); }
             if (filter.ExceptionsOnly) { filters.Add("exceptiondetails ne null"); }
 
+            // The corrected, verified signal for "can this row be debugged" — see PluginTraceLogFilter
+            // and PluginTraceLogEntry.PersistenceKey's doc comments. This filters server-side without
+            // ever selecting the (potentially large) profile column itself.
+            if (filter.HasCapturedProfile) { filters.Add("profile ne null"); }
+
             var queryParts = new List<string>
             {
                 "$select=plugintracelogid,typename,messagename,primaryentity,performanceexecutionduration," +
@@ -891,6 +896,22 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
             PersistenceKey = t.PersistenceKey,
             HasProfilingData = !string.IsNullOrEmpty(t.PersistenceKey),
         };
+
+        /// <summary>
+        /// Fetches the full captured execution data for one trace log row — only ever called on demand
+        /// (e.g. "Debug This"), never as part of the bounded list query above or its auto-refresh
+        /// polling. Returns a capture with both fields null if the row simply has no data recorded
+        /// (not an error) — callers should treat a null/empty ProfileBase64 as "nothing to debug here."
+        /// </summary>
+        public async Task<PluginTraceLogCapture> GetPluginTraceLogCaptureAsync(string traceLogId)
+        {
+            var url = $"{RecordUrl("plugintracelogs", traceLogId)}?$select=profile,secureconfiguration";
+            var dto = await RequestAsync<PluginTraceLogCaptureDto>(url).ConfigureAwait(false);
+
+            return dto == null
+                ? null
+                : new PluginTraceLogCapture { ProfileBase64 = dto.Profile, SecureConfiguration = dto.SecureConfiguration };
+        }
 
         /// <summary>Reads the org's tracing level so the UI can warn "tracing is off" instead of showing a confusing empty list.</summary>
         public async Task<PluginTraceLogSettingsInfo> GetPluginTraceLogSettingAsync()

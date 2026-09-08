@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Isolated host process for Plugin Debugging's "Debug This" — loads a real, locally-built plugin
+    assembly and invokes its Execute(IServiceProvider) with a replayed captured context, so Visual
+    Studio's debugger can attach to a disposable process rather than the main extension's own
+    devenv.exe-hosted process (a version-mismatched Microsoft.Xrm.Sdk load between this and an
+    arbitrary plugin assembly is a real, documented crash risk with no process boundary — see the
+    Plugin Debugging Phase 2 plan).
+
+    net472 (matches the rest of this extension's native code, and the plugin project template's own
+    net462 target) rather than the MCP server's net10.0 — this process loads classic .NET Framework
+    plugin assemblies and Microsoft.CrmSdk.CoreAssemblies, neither of which run on modern .NET.
+
+    Explicit x64 (not AnyCPU) so Visual Studio's EnvDTE80.Process2.Attach2 has an unambiguous bitness
+    to attach to — AnyCPU's "Prefer 32-bit" default is exactly the ambiguity this avoids. The target
+    plugin assembly itself is unconstrained (Dataverse plugins have no architecture requirement), so
+    this doesn't limit which plugins can be debugged.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <RootNamespace>D365DeveloperTools.DebugHost</RootNamespace>
+    <AssemblyName>D365 Developer Tools (Unofficial) for Visual Studio.DebugHost</AssemblyName>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CrmSdk.CoreAssemblies" Version="9.0.2.60" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <!-- The actual QueryExpression/FetchExpression-speaking connection for the live-read half of the
+         sandboxed service proxy — reinventing that translation against the raw Web API (as
+         DataverseClient.cs does for the main extension's own simpler, hand-picked OData queries) isn't
+         worthwhile here, since a plugin can hand the proxy an arbitrary QueryBase. This is Microsoft's
+         current recommended client and supports connecting via an already-issued access token directly
+         (no separate auth of its own needed) via its token-provider-function constructor. -->
+    <PackageReference Include="Microsoft.PowerPlatform.Dataverse.Client" Version="1.2.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- For XmlDictionaryReader.CreateBinaryReader (MC-NBFX decoding) and DataContractSerializer. -->
+    <Reference Include="System.Runtime.Serialization" />
+  </ItemGroup>
+
+</Project>

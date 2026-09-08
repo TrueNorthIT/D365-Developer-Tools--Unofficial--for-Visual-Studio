@@ -36,6 +36,7 @@
             <MenuItem Header="Disable" Click="OnDisableStepClick" IsEnabled="{Binding IsEnabled}" />
             <MenuItem Header="Add Image..." Click="OnAddImageClick" />
             <MenuItem Header="View Trace Logs..." Click="OnViewStepTraceLogsClick" />
+            <MenuItem Header="Debug This Step..." Click="OnDebugStepClick" />
             <MenuItem Header="Unregister..." Click="OnUnregisterStepClick" />
         </ContextMenu>
         <ContextMenu x:Key="ImageContextMenu">

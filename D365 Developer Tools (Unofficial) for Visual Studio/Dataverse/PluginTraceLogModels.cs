@@ -24,10 +24,15 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         public bool HasException => !string.IsNullOrEmpty(ExceptionDetails);
 
         /// <summary>
-        /// Kept for a future Profiler (capture/replay) feature — not used by the v1 viewer, and the
-        /// actual profilingdata blob is never fetched here. PersistenceKey ties together the pre/post
-        /// trace rows the official Plugin Registration Tool's profiler produces for one execution;
-        /// HasProfilingData only records whether a captured profile exists, not its content.
+        /// PersistenceKey ties together the pre/post trace rows the official Plugin Registration Tool's
+        /// separate Profiler solution produces, when that solution is installed and used. It is NOT a
+        /// reliable signal for "does this row have a replayable capture" — confirmed against a live
+        /// environment where real, fully-populated `profile` captures had a null PersistenceKey (that
+        /// environment has no Profiler solution installed at all; Dataverse populates `profile`
+        /// automatically for every execution once plugintracelogsetting is "All", independent of the
+        /// Profiler solution). Use PluginTraceLogFilter.HasCapturedProfile / DataverseClient's
+        /// $filter=profile ne null to find rows with a capture — never this property for that purpose.
+        /// HasProfilingData is kept only as a display hint, not a gate on any "Debug This" action.
         /// </summary>
         public string PersistenceKey { get; set; }
         public bool HasProfilingData { get; set; }
@@ -61,6 +66,9 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         public DateTime? To { get; set; }
         public bool ExceptionsOnly { get; set; }
 
+        /// <summary>Narrows to rows with a replayable capture (plugintracelog.profile ne null) — the corrected, verified signal for "can this row be debugged," used instead of PersistenceKey/HasProfilingData.</summary>
+        public bool HasCapturedProfile { get; set; }
+
         /// <summary>Bounded page size — trace log tables can be huge, so this is never followed via unbounded @odata.nextLink paging (see DataverseClient.GetPluginTraceLogsAsync).</summary>
         public int Top { get; set; } = 200;
     }
@@ -84,5 +92,20 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
     {
         public string OrganizationId { get; set; }
         public PluginTraceLogSetting Setting { get; set; }
+    }
+
+    /// <summary>
+    /// The full captured execution data for one trace log row — fetched only on demand (e.g. when the
+    /// user picks "Debug This"), never as part of the bounded list query in GetPluginTraceLogsAsync or
+    /// its auto-refresh polling, since `profile` blobs run several KB each and pulling that for every
+    /// row on every poll would reintroduce the exact jitter/bandwidth problem already fixed once there.
+    /// </summary>
+    internal sealed class PluginTraceLogCapture
+    {
+        /// <summary>Base64, MC-NBFX-encoded (a public Microsoft Open Specification, the WCF binary-XML wire format) — decoded by the debug host process, never by the main extension.</summary>
+        public string ProfileBase64 { get; set; }
+
+        /// <summary>Null when this capture has no secure configuration recorded.</summary>
+        public string SecureConfiguration { get; set; }
     }
 }
