@@ -16,7 +16,33 @@
 
             <conv:BoolToVisibilityConverter x:Key="BoolToVisibleConverter" />
             <conv:NullToVisibilityConverter x:Key="NullToVisibleConverter" />
+            <conv:EmptyToVisibleConverter x:Key="EmptyToVisibleConverter" />
             <dlg:EmptyToCollapsedConverter x:Key="EmptyToCollapsedConverter" />
+
+            <!-- Ghost-text label overlaid on a filter TextBox in place of a separate label row — saves
+                 the vertical space a real <TextBlock> above each box would cost. Pair with a same-named
+                 bound property via EmptyToVisibleConverter so it disappears the moment there's real text.
+                 Foreground is set explicitly to the *TextBox's* own themed text brush (CommonControlsColors,
+                 tuned for text on the TextBox's white/light background) rather than inheriting the root
+                 Grid's TextElement.Foreground (ToolWindowTextBrushKey, tuned for text on the tool window's
+                 own dark background) — the two differ, and the inherited one rendered this invisible
+                 (near white-on-white) regardless of VS theme. -->
+            <!-- Ghost-text label overlaid on a filter TextBox in place of a separate label row — saves
+                 the vertical space a real <TextBlock> above each box would cost. Pair with a same-named
+                 bound property via EmptyToVisibleConverter so it disappears the moment there's real text.
+                 Foreground is a plain hardcoded gray, deliberately not a DynamicResource theme brush — a
+                 themed brush (first the root Grid's inherited TextElement.Foreground, tuned for the dark
+                 tool-window background, then CommonControlsColors.TextBoxTextBrushKey) rendered invisible
+                 against the actual TextBox background both times it was tried, confirmed via a loud
+                 yellow/black diagnostic swap that the overlay mechanism itself was never the problem —
+                 only the color choice was. VS's text input fields stay light-backgrounded across every
+                 theme, so a plain gray reads reliably without needing to track that down further. -->
+            <Style x:Key="FilterPlaceholderStyle" TargetType="TextBlock">
+                <Setter Property="IsHitTestVisible" Value="False" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Margin" Value="6,0,0,0" />
+                <Setter Property="Foreground" Value="Gray" />
+            </Style>
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -58,8 +84,20 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <TextBox Grid.Column="0" Margin="0,0,2,0" Text="{Binding EntityFilter}" Padding="3" ToolTip="Filter by entity (primary entity logical name)…" />
-                <TextBox Grid.Column="1" Margin="2,0,0,0" Text="{Binding MessageFilter}" Padding="3" ToolTip="Filter by message (e.g. Create, Update)…" />
+                <Grid Grid.Column="0" Margin="0,0,2,0">
+                    <!-- UpdateSourceTrigger=PropertyChanged (not TextBox.Text's LostFocus default) —
+                         otherwise clearing the box back to empty without tabbing away leaves EntityFilter
+                         holding its last-committed non-empty value, so the placeholder below stays
+                         Collapsed even though the box now reads empty. Matches SearchText's own binding. -->
+                    <TextBox Text="{Binding EntityFilter, UpdateSourceTrigger=PropertyChanged}" Padding="3" ToolTip="Filter by entity (primary entity logical name)…" />
+                    <TextBlock Text="Entity" Style="{StaticResource FilterPlaceholderStyle}"
+                               Visibility="{Binding EntityFilter, Converter={StaticResource EmptyToVisibleConverter}}" />
+                </Grid>
+                <Grid Grid.Column="1" Margin="2,0,0,0">
+                    <TextBox Text="{Binding MessageFilter, UpdateSourceTrigger=PropertyChanged}" Padding="3" ToolTip="Filter by message (e.g. Create, Update)…" />
+                    <TextBlock Text="Message" Style="{StaticResource FilterPlaceholderStyle}"
+                               Visibility="{Binding MessageFilter, Converter={StaticResource EmptyToVisibleConverter}}" />
+                </Grid>
             </Grid>
 
             <Grid Margin="0,0,0,4">
@@ -85,7 +123,11 @@
                 <Button Grid.Column="3" Content="Refresh" Command="{Binding RefreshCommand}" Padding="8,3" />
             </Grid>
 
-            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Padding="3" ToolTip="Search loaded results (type/trace text/exception)…" />
+            <Grid>
+                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Padding="3" ToolTip="Search loaded results (type/trace text/exception)…" />
+                <TextBlock Text="Search…" Style="{StaticResource FilterPlaceholderStyle}"
+                           Visibility="{Binding SearchText, Converter={StaticResource EmptyToVisibleConverter}}" />
+            </Grid>
         </StackPanel>
 
         <!-- Body -->
