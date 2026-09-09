@@ -36,6 +36,9 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         /// </summary>
         public string PersistenceKey { get; set; }
         public bool HasProfilingData { get; set; }
+
+        /// <summary>Composite label for the Profile Captures tab's detail pane — plugintracelog has no "label"/"name" field of its own.</summary>
+        public string Label => TypeName + " — " + (string.IsNullOrEmpty(PrimaryEntity) ? MessageName : $"{MessageName}: {PrimaryEntity}");
     }
 
     /// <summary>
@@ -66,7 +69,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         public DateTime? To { get; set; }
         public bool ExceptionsOnly { get; set; }
 
-        /// <summary>Narrows to rows with a replayable capture (plugintracelog.profile ne null) — the corrected, verified signal for "can this row be debugged," used instead of PersistenceKey/HasProfilingData.</summary>
+        /// <summary>Narrows to rows with a replayable capture (plugintracelog.profile ne null) — the corrected, verified signal for "can this row be debugged," used instead of PersistenceKey/HasProfilingData. Also how Plugin Explorer's "Start Profiling..." scopes the Profile Captures tab to one step's session, combined with TypeName+From.</summary>
         public bool HasCapturedProfile { get; set; }
 
         /// <summary>Bounded page size — trace log tables can be huge, so this is never followed via unbounded @odata.nextLink paging (see DataverseClient.GetPluginTraceLogsAsync).</summary>

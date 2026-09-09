@@ -88,8 +88,10 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.PluginDebugging
             }
 
             // Deliberately an anonymous object, not DebugHost's own JobRequest type — the two projects
-            // don't share a reference (see the Plugin Debugging Phase 2 plan), so this is the wire shape,
-            // hand-kept in sync with JobRequest.cs's property names.
+            // don't share a reference, so this is the wire shape, hand-kept in sync with JobRequest.cs's
+            // property names. .DebugHost proxies live Retrieve/RetrieveMultiple/read-shaped Execute calls
+            // against the real org during replay (writes are sandboxed/recorded, never sent) — see
+            // SandboxedOrganizationService — so EnvironmentUrl/AccessToken do need to travel with the job.
             var job = new
             {
                 SchemaVersion = 1,

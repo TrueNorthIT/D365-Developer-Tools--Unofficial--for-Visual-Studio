@@ -17,6 +17,8 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.PluginDebugging
         public string FailureMessage { get; set; }
         public List<string> TraceMessages { get; set; } = new List<string>();
         public List<SandboxedWriteInfo> SandboxedWrites { get; set; } = new List<SandboxedWriteInfo>();
+
+        /// <summary>GUID ids of profile entries that could not be decoded/mapped — see the two-tier graceful-degradation policy in ProfileEnvelopeReader/ProfileContextBuilder.</summary>
         public List<string> UndecodedProfileEntries { get; set; } = new List<string>();
 
         public static ReplaySessionResult Failed(string message) => new ReplaySessionResult { Succeeded = false, FailureMessage = message };

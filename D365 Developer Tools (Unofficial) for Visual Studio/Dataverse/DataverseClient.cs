@@ -242,7 +242,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
             var queryParts = new List<string>
             {
                 "$select=sdkmessageprocessingstepid,name,stage,mode,rank,statecode,filteringattributes,description,configuration," +
-                    "_sdkmessageid_value,_sdkmessagefilterid_value,_impersonatinguserid_value,_sdkmessageprocessingstepsecureconfigid_value",
+                    "_plugintypeid_value,_sdkmessageid_value,_sdkmessagefilterid_value,_impersonatinguserid_value,_sdkmessageprocessingstepsecureconfigid_value",
                 $"$filter={filter}",
             };
             if (orderBy != null) { queryParts.Add(orderBy); }
@@ -265,6 +265,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                 {
                     StepId = s.SdkMessageProcessingStepId,
                     Name = s.Name,
+                    PluginTypeId = s.PluginTypeIdValue,
                     SdkMessageId = s.SdkMessageIdValue,
                     MessageName = s.SdkMessageIdValue != null && messageNames.TryGetValue(s.SdkMessageIdValue, out var messageName) ? messageName : null,
                     SdkMessageFilterId = s.SdkMessageFilterIdValue,
@@ -897,6 +898,37 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
             HasProfilingData = !string.IsNullOrEmpty(t.PersistenceKey),
         };
 
+        /// <summary>Reads the org's tracing level so the UI can warn "tracing is off" instead of showing a confusing empty list.</summary>
+        public async Task<PluginTraceLogSettingsInfo> GetPluginTraceLogSettingAsync()
+        {
+            var orgId = _connectionManager.Connection.WhoAmI.OrganizationId;
+            var url = $"{RecordUrl("organizations", orgId)}?$select=organizationid,plugintracelogsetting";
+            var org = await RequestAsync<OrganizationTraceSettingDto>(url).ConfigureAwait(false);
+
+            return org == null
+                ? null
+                : new PluginTraceLogSettingsInfo { OrganizationId = org.OrganizationId, Setting = (PluginTraceLogSetting)org.PluginTraceLogSetting };
+        }
+
+        /// <summary>Changes the org-wide tracing level — the same write the Plugin Registration Tool's "Settings" dialog performs. Also how Plugin Debugging's own tracing-level dropdown works (see PluginDebuggingViewModel.SetTracingLevelAsync) — Start/Stop Profiling deliberately never calls this itself (see the Plugin Debugging plan's history — an earlier iteration auto-toggled it and auto-restored the prior value on Stop, but a manual, always-visible dropdown the user controls directly turned out simpler and less surprising).</summary>
+        public Task SetPluginTraceLogSettingAsync(string organizationId, PluginTraceLogSetting setting) =>
+            UpdateRecordAsync("organizations", organizationId, new { plugintracelogsetting = (int)setting });
+
+        /// <summary>
+        /// Toggles sdkmessageprocessingstep's own genuine, native "enablepluginprofiler" boolean — the
+        /// real per-step server-side mechanism Start/Stop Profiling arms, confirmed live against a real
+        /// org: flipping this true on a step causes Dataverse itself to populate plugintracelog.profile
+        /// for that step's subsequent executions (once the org's own tracing level is at least "All" —
+        /// see PluginTraceLogSetting/the tracing-level dropdown), producing exactly the MC-NBFX capture
+        /// format ProfileEnvelopeReader/NbfxEntryDecoder/ProfileContextBuilder already decode. This is
+        /// completely independent of the separate, unrelated "Plug-in Profiler" managed solution
+        /// (mbs_pluginprofile/PluginProfiler.Plugins.ProfilerPlugin) — no wrapper step, no custom entity,
+        /// no third-party install of any kind. This is the actual mechanism the Plugin Registration
+        /// Tool's own "Start/Stop Profiling" uses.
+        /// </summary>
+        public Task SetStepProfilingEnabledAsync(string stepId, bool enabled) =>
+            UpdateRecordAsync("sdkmessageprocessingsteps", stepId, new { enablepluginprofiler = enabled });
+
         /// <summary>
         /// Fetches the full captured execution data for one trace log row — only ever called on demand
         /// (e.g. "Debug This"), never as part of the bounded list query above or its auto-refresh
@@ -912,22 +944,6 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                 ? null
                 : new PluginTraceLogCapture { ProfileBase64 = dto.Profile, SecureConfiguration = dto.SecureConfiguration };
         }
-
-        /// <summary>Reads the org's tracing level so the UI can warn "tracing is off" instead of showing a confusing empty list.</summary>
-        public async Task<PluginTraceLogSettingsInfo> GetPluginTraceLogSettingAsync()
-        {
-            var orgId = _connectionManager.Connection.WhoAmI.OrganizationId;
-            var url = $"{RecordUrl("organizations", orgId)}?$select=organizationid,plugintracelogsetting";
-            var org = await RequestAsync<OrganizationTraceSettingDto>(url).ConfigureAwait(false);
-
-            return org == null
-                ? null
-                : new PluginTraceLogSettingsInfo { OrganizationId = org.OrganizationId, Setting = (PluginTraceLogSetting)org.PluginTraceLogSetting };
-        }
-
-        /// <summary>Changes the org-wide tracing level — the same write the Plugin Registration Tool's "Settings" dialog performs.</summary>
-        public Task SetPluginTraceLogSettingAsync(string organizationId, PluginTraceLogSetting setting) =>
-            UpdateRecordAsync("organizations", organizationId, new { plugintracelogsetting = (int)setting });
 
         // ── Internals ────────────────────────────────────────────────────────
 

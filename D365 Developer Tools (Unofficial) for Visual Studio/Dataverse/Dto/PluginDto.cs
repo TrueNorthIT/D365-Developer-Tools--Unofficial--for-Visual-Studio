@@ -51,6 +51,9 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse.Dto
         public string Description { get; set; }
         public string Configuration { get; set; }
 
+        [JsonProperty("_plugintypeid_value")]
+        public string PluginTypeIdValue { get; set; }
+
         [JsonProperty("_sdkmessageid_value")]
         public string SdkMessageIdValue { get; set; }
 

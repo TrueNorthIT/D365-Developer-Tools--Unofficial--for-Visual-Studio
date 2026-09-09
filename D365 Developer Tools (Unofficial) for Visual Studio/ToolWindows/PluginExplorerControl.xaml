@@ -30,13 +30,18 @@
             <MenuItem Header="Add Step..." Click="OnAddStepClick" />
             <MenuItem Header="Unregister..." Click="OnUnregisterTypeClick" />
         </ContextMenu>
-        <ContextMenu x:Key="StepContextMenu">
+        <!-- Start/Stop Profiling visibility is toggled imperatively in OnStepContextMenuOpened (code-behind)
+             rather than bound — a ContextMenu is a separate visual-tree root, so its own items don't
+             inherit the row's DataContext the way TryGetRowDataContext's PlacementTarget workaround
+             already has to account for elsewhere in this file. -->
+        <ContextMenu x:Key="StepContextMenu" Opened="OnStepContextMenuOpened">
             <MenuItem Header="Edit Step..." Click="OnEditStepClick" />
             <MenuItem Header="Enable" Click="OnEnableStepClick" IsEnabled="{Binding IsEnabled, Converter={StaticResource InverseBoolConverter}}" />
             <MenuItem Header="Disable" Click="OnDisableStepClick" IsEnabled="{Binding IsEnabled}" />
             <MenuItem Header="Add Image..." Click="OnAddImageClick" />
             <MenuItem Header="View Trace Logs..." Click="OnViewStepTraceLogsClick" />
-            <MenuItem Header="Debug This Step..." Click="OnDebugStepClick" />
+            <MenuItem Header="Start Profiling..." Click="OnStartProfilingClick" />
+            <MenuItem Header="Stop Profiling..." Click="OnStopProfilingClick" />
             <MenuItem Header="Unregister..." Click="OnUnregisterStepClick" />
         </ContextMenu>
         <ContextMenu x:Key="ImageContextMenu">
@@ -77,11 +82,15 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <img:CrispImage Grid.Column="0" Width="16" Height="16" Margin="0,0,4,0" VerticalAlignment="Center" Moniker="{x:Static catalog:KnownMonikers.Event}" />
                 <TextBlock Grid.Column="1" Text="{Binding Summary}" TextTrimming="CharacterEllipsis"
                            ToolTip="{Binding FilteringAttributes}" />
-                <TextBlock Grid.Column="2" Margin="6,0,0,0" Opacity="0.6" FontSize="10" Text="{Binding Mode}" />
+                <TextBlock Grid.Column="2" Margin="6,0,0,0" Foreground="#2D7DD2" FontSize="11" Text="●" VerticalAlignment="Center"
+                           ToolTip="Currently profiling — a Plug-in Profiler wrapper is standing in for this step"
+                           Visibility="{Binding IsProfiling, Converter={StaticResource BoolToVisibleConverter}}" />
+                <TextBlock Grid.Column="3" Margin="6,0,0,0" Opacity="0.6" FontSize="10" Text="{Binding Mode}" />
             </Grid>
         </HierarchicalDataTemplate>
 

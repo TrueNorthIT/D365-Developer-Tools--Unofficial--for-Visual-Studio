@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -17,8 +18,13 @@ using Microsoft.VisualStudio.Shell;
 namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewModels
 {
     /// <summary>
-    /// Backs PluginDebuggingControl — views/filters plugintracelog records, similar to the Plugin
-    /// Registration Tool's Profiler log grid, but view/filter only (no capture/replay in v1).
+    /// Backs PluginDebuggingControl — two tabs: "Trace Logs" (the plain plugintracelog viewer) and
+    /// "Profile Captures" (the same plugintracelog table, scoped to one step's Start/Stop Profiling
+    /// session and narrowed to rows with a captured profile — where "Debug This" actually lives). Both
+    /// tabs, and the header's trace-logging-level dropdown, sit on top of the one native Dataverse
+    /// mechanism: plugintracelog.profile, populated automatically for every execution once
+    /// plugintracelogsetting is "All" — no installable solution, no custom entity, no per-step
+    /// registration change of any kind.
     /// </summary>
     internal sealed class PluginDebuggingViewModel : ObservableObject
     {
@@ -53,8 +59,12 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         private string _lastQueryDescription;
         public string LastQueryDescription { get => _lastQueryDescription; private set => SetProperty(ref _lastQueryDescription, value); }
 
-        // ── Structured filters — sent to Dataverse as an OData $filter on RefreshCommand, unlike
-        // SearchText below which only narrows the already-loaded page client-side. ─────────────────
+        private int _selectedTabIndex;
+
+        /// <summary>0 = Trace Logs, 1 = Profile Captures.</summary>
+        public int SelectedTabIndex { get => _selectedTabIndex; set => SetProperty(ref _selectedTabIndex, value); }
+
+        // ── Trace Logs tab ───────────────────────────────────────────────────────────────────────────
 
         // Full properties (not plain auto-properties) so LoadForStepAsync's programmatic prefill
         // below actually notifies the bound TextBoxes, not just user typing.
@@ -71,18 +81,6 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             set
             {
                 if (SetProperty(ref _exceptionsOnly, value)) { RefreshAsync().FileAndForget("D365DeveloperTools/RefreshTraceLogsAfterExceptionsOnlyToggle"); }
-            }
-        }
-
-        private bool _hasCapturedProfileOnly;
-
-        /// <summary>Narrows to rows with a replayable capture (plugintracelog.profile ne null) — see PluginTraceLogFilter.HasCapturedProfile's doc comment for why this, not PersistenceKey/HasProfilingData, is the correct signal.</summary>
-        public bool HasCapturedProfileOnly
-        {
-            get => _hasCapturedProfileOnly;
-            set
-            {
-                if (SetProperty(ref _hasCapturedProfileOnly, value)) { RefreshAsync().FileAndForget("D365DeveloperTools/RefreshTraceLogsAfterHasCapturedProfileToggle"); }
             }
         }
 
@@ -103,6 +101,32 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             set
             {
                 if (SetProperty(ref _toDate, value)) { RefreshAsync().FileAndForget("D365DeveloperTools/RefreshTraceLogsAfterToDateChange"); }
+            }
+        }
+
+        /// <summary>
+        /// Free-text "HH:mm:ss" companion to FromDate/ToDate — DatePicker.SelectedDate only ever carries
+        /// a calendar date (time defaults to midnight), so without this the actual query's From/To bound
+        /// would silently always be start-of-day, with no way to narrow to a specific moment. Blank falls
+        /// back to start of day (From) / end of day (To) — see CombineDateAndTime.
+        /// </summary>
+        private string _fromTimeText = string.Empty;
+        public string FromTimeText
+        {
+            get => _fromTimeText;
+            set
+            {
+                if (SetProperty(ref _fromTimeText, value)) { RefreshAsync().FileAndForget("D365DeveloperTools/RefreshTraceLogsAfterFromTimeChange"); }
+            }
+        }
+
+        private string _toTimeText = string.Empty;
+        public string ToTimeText
+        {
+            get => _toTimeText;
+            set
+            {
+                if (SetProperty(ref _toTimeText, value)) { RefreshAsync().FileAndForget("D365DeveloperTools/RefreshTraceLogsAfterToTimeChange"); }
             }
         }
 
@@ -137,6 +161,26 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
 
         public bool IsTracingOff => TracingSetting?.Setting == PluginTraceLogSetting.Off;
 
+        /// <summary>The three raw plugintracelogsetting values, for the header's tracing-level dropdown — bound directly, no separate label wrapper needed since the enum's own names ("Off"/"Exception"/"All") are exactly what should be shown.</summary>
+        public IReadOnlyList<PluginTraceLogSetting> TracingLevelOptions { get; } = new[] { PluginTraceLogSetting.Off, PluginTraceLogSetting.Exception, PluginTraceLogSetting.All };
+
+        /// <summary>
+        /// The org's current trace-logging level, settable directly from the dropdown — a manual control
+        /// the user drives themselves. Deliberately never changed automatically by Start Profiling: an
+        /// earlier iteration auto-set it to All and auto-restored the prior value afterward, but that
+        /// turned out more surprising than useful (Exception is a legitimate, deliberate choice — e.g.
+        /// only capturing executions that throw — not something to silently override).
+        /// </summary>
+        public PluginTraceLogSetting? SelectedTracingLevel
+        {
+            get => TracingSetting?.Setting;
+            set
+            {
+                if (value == null || TracingSetting == null || value == TracingSetting.Setting) { return; }
+                SetTracingLevelAsync(value.Value).FileAndForget("D365DeveloperTools/SetTracingLevel");
+            }
+        }
+
         private bool _isAutoRefreshEnabled;
         public bool IsAutoRefreshEnabled
         {
@@ -147,6 +191,71 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
                 if (value) { _autoRefreshTimer.Start(); } else { _autoRefreshTimer.Stop(); }
             }
         }
+
+        // ── Profile Captures tab ─────────────────────────────────────────────────────────────────────
+
+        public ObservableCollection<PluginTraceLogEntry> ProfileEntries { get; } = new ObservableCollection<PluginTraceLogEntry>();
+
+        private PluginTraceLogEntry _selectedProfileEntry;
+        public PluginTraceLogEntry SelectedProfileEntry { get => _selectedProfileEntry; set => SetProperty(ref _selectedProfileEntry, value); }
+
+        /// <summary>The original step id currently scoped, if profiling was armed from Plugin Explorer — needed so "Stop Profiling" from this tab knows which step to stop.</summary>
+        private string _profiledStepId;
+        private string _profiledStepTypeName;
+
+        private DateTime? _profileFromDate;
+
+        /// <summary>Defaults to the moment profiling was armed (see LoadForProfiledStepAsync), but freely adjustable afterward — e.g. to widen the window and see captures from before this session, or narrow it. Not a hard floor like the old fixed session-start cutoff was.</summary>
+        public DateTime? ProfileFromDate
+        {
+            get => _profileFromDate;
+            set
+            {
+                if (SetProperty(ref _profileFromDate, value)) { RefreshProfileCapturesAsync().FileAndForget("D365DeveloperTools/RefreshProfileCapturesAfterFromDateChange"); }
+            }
+        }
+
+        private DateTime? _profileToDate;
+        public DateTime? ProfileToDate
+        {
+            get => _profileToDate;
+            set
+            {
+                if (SetProperty(ref _profileToDate, value)) { RefreshProfileCapturesAsync().FileAndForget("D365DeveloperTools/RefreshProfileCapturesAfterToDateChange"); }
+            }
+        }
+
+        /// <summary>
+        /// Free-text "HH:mm:ss" companion to ProfileFromDate/ProfileToDate — LoadForProfiledStepAsync
+        /// seeds this with the exact time-of-day profiling was armed, which a bare DatePicker would
+        /// otherwise carry silently without ever showing it. Blank falls back to start of day (From) /
+        /// end of day (To) — see CombineDateAndTime.
+        /// </summary>
+        private string _profileFromTimeText = string.Empty;
+        public string ProfileFromTimeText
+        {
+            get => _profileFromTimeText;
+            set
+            {
+                if (SetProperty(ref _profileFromTimeText, value)) { RefreshProfileCapturesAsync().FileAndForget("D365DeveloperTools/RefreshProfileCapturesAfterFromTimeChange"); }
+            }
+        }
+
+        private string _profileToTimeText = string.Empty;
+        public string ProfileToTimeText
+        {
+            get => _profileToTimeText;
+            set
+            {
+                if (SetProperty(ref _profileToTimeText, value)) { RefreshProfileCapturesAsync().FileAndForget("D365DeveloperTools/RefreshProfileCapturesAfterToTimeChange"); }
+            }
+        }
+
+        private bool _hasActiveProfilingSession;
+        public bool HasActiveProfilingSession { get => _hasActiveProfilingSession; private set => SetProperty(ref _hasActiveProfilingSession, value); }
+
+        private string _activeProfilingSessionLabel;
+        public string ActiveProfilingSessionLabel { get => _activeProfilingSessionLabel; private set => SetProperty(ref _activeProfilingSessionLabel, value); }
 
         private DebugSessionInfo _debugSession;
 
@@ -159,9 +268,10 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         public ICommand RefreshCommand { get; }
         public ICommand ShowMenuCommand { get; }
         public ICommand ClearStepFilterCommand { get; }
-        public ICommand EnableTracingCommand { get; }
         public ICommand DebugCommand { get; }
         public ICommand StopDebugSessionCommand { get; }
+        public ICommand RefreshProfileCapturesCommand { get; }
+        public ICommand StopProfilingSessionCommand { get; }
 
         public PluginDebuggingViewModel(ConnectionManager connectionManager, DataverseClient client, IUserPrompts prompts)
         {
@@ -182,11 +292,14 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             RefreshCommand = new AsyncRelayCommand(() => RefreshAsync());
             ShowMenuCommand = new AsyncRelayCommand(() => ConnectionMenu.ShowAsync(_connectionManager, _prompts));
             ClearStepFilterCommand = new RelayCommand(_ => ClearStepFilter());
-            EnableTracingCommand = new AsyncRelayCommand(EnableTracingAsync);
             DebugCommand = new AsyncRelayCommand(
-                () => DebugPluginCaptureCommand.ExecuteAsync(SelectedEntry),
-                () => SelectedEntry != null && DebugSession == null);
+                () => DebugPluginCaptureCommand.ExecuteAsync(SelectedProfileEntry),
+                () => SelectedProfileEntry != null && DebugSession == null);
             StopDebugSessionCommand = new RelayCommand(_ => StopDebugSession(), _ => DebugSession != null);
+            RefreshProfileCapturesCommand = new AsyncRelayCommand(() => RefreshProfileCapturesAsync());
+            StopProfilingSessionCommand = new AsyncRelayCommand(
+                () => StopProfilingCommand.ExecuteAsync(_profiledStepId),
+                () => HasActiveProfilingSession);
 
             // See EntityExplorerViewModel's constructor for why this hops to the UI thread first.
             _connectionManager.ConnectionChanged += (_, __) =>
@@ -213,37 +326,73 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             {
                 CheckTracingSettingAsync().FileAndForget("D365DeveloperTools/CheckPluginTraceLogSetting");
                 RefreshAsync().FileAndForget("D365DeveloperTools/RefreshPluginTraceLogs");
+                if (_profiledStepTypeName != null) { RefreshProfileCapturesAsync().FileAndForget("D365DeveloperTools/RefreshProfileCapturesOnConnect"); }
             }
             else
             {
                 Entries.Clear();
+                ProfileEntries.Clear();
                 TracingSetting = null;
                 StopAutoRefresh();
             }
         }
 
         /// <summary>
-        /// Scopes the grid to one plugin type (e.g. from Plugin Explorer's "View Trace Logs..."
-        /// command) and refreshes. Only TypeName is applied to the query — messageName/primaryEntity
-        /// are shown in stepLabel for context but deliberately NOT written into EntityFilter/
-        /// MessageFilter, since AND-ing all three turned out too strict in practice (a single
-        /// mismatched field, e.g. a primaryentity that isn't recorded exactly the way the step's own
-        /// entity filter is, silently zeroes the whole result). TypeName alone is the field this
+        /// Scopes the Trace Logs tab to one plugin type (e.g. from Plugin Explorer's "View Trace
+        /// Logs..." command) and refreshes. Only TypeName is applied to the query — messageName/
+        /// primaryEntity are shown in stepLabel for context but deliberately NOT written into
+        /// EntityFilter/MessageFilter, since AND-ing all three turned out too strict in practice (a
+        /// single mismatched field, e.g. a primaryentity that isn't recorded exactly the way the step's
+        /// own entity filter is, silently zeroes the whole result). TypeName alone is the field this
         /// feature has the most confidence in, and the user can still narrow further by hand using the
         /// regular Entity/Message boxes plus Refresh if they want tighter matching.
         /// </summary>
-        public async Task LoadForStepAsync(string pluginTypeName, string stepLabel, bool requireCapturedProfile = false)
+        public async Task LoadForStepAsync(string pluginTypeName, string stepLabel)
         {
             _stepFilterTypeName = pluginTypeName;
             StepFilterLabel = stepLabel;
             OnPropertyChanged(nameof(HasStepFilter));
-
-            // Setting this (rather than passing it straight into RefreshAsync's own filter) so the
-            // checkbox in PluginDebuggingControl reflects it too — "Debug This Step..." arms a capture
-            // and this filter is exactly what finds it once triggered.
-            if (requireCapturedProfile) { _hasCapturedProfileOnly = true; OnPropertyChanged(nameof(HasCapturedProfileOnly)); }
-
+            SelectedTabIndex = 0;
             await RefreshAsync().ConfigureAwait(true);
+        }
+
+        /// <summary>
+        /// Scopes the Profile Captures tab to one just-armed profiling session and switches to it —
+        /// called by StartProfilingCommand right after arming. sessionStartedAtUtc seeds ProfileFromDate
+        /// as a sensible default (so the tab starts out showing "since I armed this"), but it's just a
+        /// starting value the user can freely widen or narrow afterward via the From/To pickers — not a
+        /// hard floor baked into every query the way a fixed session-start cutoff used to be.
+        /// </summary>
+        public async Task LoadForProfiledStepAsync(string originalStepId, string pluginTypeName, DateTime sessionStartedAtUtc, string stepLabel)
+        {
+            _profiledStepId = originalStepId;
+            _profiledStepTypeName = pluginTypeName;
+            ActiveProfilingSessionLabel = stepLabel;
+            HasActiveProfilingSession = true;
+            SelectedTabIndex = 1;
+
+            // Set the backing fields directly (not the ProfileFromDate/ProfileToDate/*TimeText properties)
+            // so this doesn't trigger several redundant refreshes back to back — the explicit call below
+            // covers it. The time text is seeded from the exact same instant as the date, so the user
+            // sees the real armed-at moment (down to the second) rather than it silently defaulting to
+            // midnight the way a bare DatePicker-bound DateTime would otherwise display.
+            _profileFromDate = sessionStartedAtUtc;
+            _profileFromTimeText = sessionStartedAtUtc.ToString("HH:mm:ss");
+            _profileToDate = null;
+            _profileToTimeText = string.Empty;
+            OnPropertyChanged(nameof(ProfileFromDate));
+            OnPropertyChanged(nameof(ProfileFromTimeText));
+            OnPropertyChanged(nameof(ProfileToDate));
+            OnPropertyChanged(nameof(ProfileToTimeText));
+
+            await RefreshProfileCapturesAsync().ConfigureAwait(true);
+        }
+
+        /// <summary>Called by Commands.StopProfilingCommand once a step's session is forgotten — already-captured rows stay listed and debuggable.</summary>
+        public void OnProfilingStopped()
+        {
+            HasActiveProfilingSession = false;
+            ActiveProfilingSessionLabel = null;
         }
 
         public void ClearStepFilter()
@@ -275,9 +424,8 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
                     PrimaryEntity = string.IsNullOrWhiteSpace(EntityFilter) ? null : EntityFilter.Trim(),
                     MessageName = string.IsNullOrWhiteSpace(MessageFilter) ? null : MessageFilter.Trim(),
                     ExceptionsOnly = ExceptionsOnly,
-                    HasCapturedProfile = HasCapturedProfileOnly,
-                    From = FromDate,
-                    To = ToDate,
+                    From = CombineDateAndTime(FromDate, FromTimeText, endOfDayIfBlank: false),
+                    To = CombineDateAndTime(ToDate, ToTimeText, endOfDayIfBlank: true),
                 };
 
                 LastQueryDescription =
@@ -318,6 +466,44 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             }
         }
 
+        private string _lastProfileQueryDescription;
+
+        /// <summary>Mirrors LastQueryDescription for the Profile Captures tab — RefreshProfileCapturesAsync used to fail completely silently on an empty result, with no way to tell TypeName/From/HasCapturedProfile apart as the cause.</summary>
+        public string LastProfileQueryDescription { get => _lastProfileQueryDescription; private set => SetProperty(ref _lastProfileQueryDescription, value); }
+
+        /// <summary>Manual only — no auto-poll. Profile captures are deliberate, bounded (the user triggers the action a handful of times), not a firehose like plugintracelog, so a 5s timer would just be extra load for no benefit.</summary>
+        public async Task RefreshProfileCapturesAsync()
+        {
+            if (!IsConnected || _profiledStepTypeName == null) { return; }
+
+            try
+            {
+                var filter = new PluginTraceLogFilter
+                {
+                    TypeName = _profiledStepTypeName,
+                    HasCapturedProfile = true,
+                    From = CombineDateAndTime(ProfileFromDate, ProfileFromTimeText, endOfDayIfBlank: false),
+                    To = CombineDateAndTime(ProfileToDate, ProfileToTimeText, endOfDayIfBlank: true),
+                    Top = 50,
+                };
+
+                LastProfileQueryDescription = $"Type={filter.TypeName}, From={filter.From:o}, To={filter.To:o}, HasCapturedProfile=true";
+
+                var page = await _client.GetPluginTraceLogsAsync(filter).ConfigureAwait(true);
+                LastProfileQueryDescription += $" → {page.Items.Count} row(s)";
+
+                var previousSelectedId = SelectedProfileEntry?.TraceLogId;
+                ProfileEntries.Clear();
+                foreach (var capture in page.Items) { ProfileEntries.Add(capture); }
+                SelectedProfileEntry = previousSelectedId == null ? null : ProfileEntries.FirstOrDefault(e => e.TraceLogId == previousSelectedId);
+            }
+            catch (Exception ex)
+            {
+                LastProfileQueryDescription += $" → ERROR: {ex.Message}";
+                _prompts.ShowError($"D365: Failed to load profile captures: {ex.Message}");
+            }
+        }
+
         private async Task CheckTracingSettingAsync()
         {
             try
@@ -329,20 +515,24 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
                 // Best-effort — the banner just won't show if this fails; it shouldn't block the log grid.
                 TracingSetting = null;
             }
+
+            // TracingSetting's own SetProperty only notifies "TracingSetting" itself — these two derive
+            // from it but aren't automatically re-evaluated by bound controls without an explicit nudge.
+            OnPropertyChanged(nameof(IsTracingOff));
+            OnPropertyChanged(nameof(SelectedTracingLevel));
         }
 
-        private async Task EnableTracingAsync()
+        private async Task SetTracingLevelAsync(PluginTraceLogSetting setting)
         {
             if (TracingSetting == null) { return; }
 
             try
             {
-                await _client.SetPluginTraceLogSettingAsync(TracingSetting.OrganizationId, PluginTraceLogSetting.All).ConfigureAwait(true);
+                await _client.SetPluginTraceLogSettingAsync(TracingSetting.OrganizationId, setting).ConfigureAwait(true);
             }
             catch (Exception ex)
             {
-                _prompts.ShowError($"D365: Failed to enable plugin trace logging: {ex.Message}");
-                return;
+                _prompts.ShowError($"D365: Failed to change plugin trace logging: {ex.Message}");
             }
 
             await CheckTracingSettingAsync().ConfigureAwait(true);
@@ -360,6 +550,27 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
 
         private static bool Contains(string haystack, string query) =>
             !string.IsNullOrEmpty(haystack) && haystack.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0;
+
+        /// <summary>
+        /// Merges a DatePicker-bound calendar date with its free-text "HH:mm:ss" companion into the
+        /// actual DateTime sent to the server — DatePicker.SelectedDate only ever carries a date (time
+        /// always midnight), so without this every From/To bound would silently be start-of-day
+        /// regardless of what the user actually wants. A blank or unparseable time falls back to start
+        /// of day for a "From" bound (endOfDayIfBlank: false) or end of day for a "To" bound
+        /// (endOfDayIfBlank: true) — matching ordinary date-range-filter conventions (a bare "To" date
+        /// should include that whole day, not exclude everything past midnight of it).
+        /// </summary>
+        private static DateTime? CombineDateAndTime(DateTime? date, string timeText, bool endOfDayIfBlank)
+        {
+            if (date == null) { return null; }
+
+            if (!string.IsNullOrWhiteSpace(timeText) && TimeSpan.TryParse(timeText.Trim(), out var time))
+            {
+                return date.Value.Date + time;
+            }
+
+            return endOfDayIfBlank ? date.Value.Date.AddDays(1).AddTicks(-1) : date.Value.Date;
+        }
 
         /// <summary>
         /// Stops the auto-refresh timer — called on disconnect and from PluginDebuggingToolWindow.Dispose

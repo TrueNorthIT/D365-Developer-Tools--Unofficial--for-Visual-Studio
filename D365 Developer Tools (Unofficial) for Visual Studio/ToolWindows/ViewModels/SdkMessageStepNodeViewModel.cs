@@ -2,6 +2,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse;
+using D365_Developer_Tools__Unofficial__for_Visual_Studio.PluginDebugging;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Mvvm;
 using Microsoft.VisualStudio.Shell;
 
@@ -29,6 +30,17 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
         public int Rank => Step.Rank;
         public bool IsEnabled => Step.IsEnabled;
         public string FilteringAttributes => Step.FilteringAttributes;
+
+        private bool _isProfiling;
+
+        /// <summary>Whether "Start Profiling..." has armed this step (a wrapper step is standing in for it right now) — drives both the Start/Stop menu-item toggle and the tree's own visual indicator. Local-only state (ProfilingSessionStore), not a live Dataverse check, so it can go stale if profiling was started/stopped from a different VS session — refreshed on every context-menu open regardless.</summary>
+        public bool IsProfiling { get => _isProfiling; private set => SetProperty(ref _isProfiling, value); }
+
+        /// <summary>Re-checks ProfilingSessionStore for this step — called at construction and again right after Start/Stop Profiling completes (or a context menu opens) so the indicator never has to wait for a full tree reload.</summary>
+        public void RefreshProfilingState()
+        {
+            IsProfiling = ProfilingSessionStore.TryGet(Step.StepId) != null;
+        }
 
         public string Summary =>
             PrimaryEntity == null ? $"{MessageName}  ({Stage})" : $"{MessageName}: {PrimaryEntity}  ({Stage})";
@@ -59,6 +71,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.ToolWindows.ViewMo
             _step = step;
             _client = client;
             PluginTypeFriendlyName = pluginTypeFriendlyName;
+            RefreshProfilingState();
 
             // A placeholder child so the TreeViewItem shows its expand chevron before the real
             // images are lazy-loaded (WPF hides the chevron whenever HasItems is false).

@@ -29,6 +29,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
     {
         public string StepId { get; set; }
         public string Name { get; set; }
+        public string PluginTypeId { get; set; }
         public string SdkMessageId { get; set; }
         public string MessageName { get; set; }
 

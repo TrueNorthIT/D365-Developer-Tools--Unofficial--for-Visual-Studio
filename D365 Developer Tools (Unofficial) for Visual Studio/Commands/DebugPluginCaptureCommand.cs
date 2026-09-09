@@ -11,11 +11,12 @@ using Microsoft.VisualStudio.Shell;
 namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
 {
     /// <summary>
-    /// "Debug This" on a Plugin Debugging trace-log row. Resolves the local project (auto-remembered by
-    /// PublishToDataverseCommand's own type discovery, or a one-time picker otherwise), builds it in
-    /// Debug configuration (real breakpoint/symbol fidelity — Release strips that), fetches the full
-    /// capture, and hands off to PluginCaptureHostLauncher to launch the isolated host process and attach
-    /// Visual Studio's debugger to it. See the Plugin Debugging Phase 2 plan.
+    /// "Debug This" on a Plugin Debugging "Profile Captures" row (a plugintracelog row with a captured
+    /// profile). Resolves the local project (auto-remembered by PublishToDataverseCommand's own type
+    /// discovery, auto-matched by an already-open project's AssemblyName, or a one-time picker
+    /// otherwise), builds it in Debug configuration (real breakpoint/symbol fidelity — Release strips
+    /// that), fetches the full capture, and hands off to PluginCaptureHostLauncher to launch the isolated
+    /// host process and attach Visual Studio's debugger to it.
     /// </summary>
     internal static class DebugPluginCaptureCommand
     {
@@ -46,9 +47,8 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
             // AssemblyName, Version=..., Culture=..., PublicKeyToken=..." — see PluginTraceLogModels.cs),
             // but DebugTargetStore is auto-populated by PublishToDataverseCommand using PluginTypeScanner's
             // bare Type.FullName. Using entry.TypeName as-is here would never hit an auto-remembered
-            // entry (confirmed via a real "Type not found" replay failure that traced back to this same
-            // assembly-qualified/bare mismatch in PluginInvoker) — normalize to the bare name first so
-            // both sides of DebugTargetStore actually share one key space.
+            // entry — normalize to the bare name first so both sides of DebugTargetStore actually share
+            // one key space.
             var bareTypeName = entry.TypeName.Split(',')[0].Trim();
             var openProjects = VsShellHelper.GetAllProjects(dte);
 
@@ -139,9 +139,8 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
                 SecureConfiguration = capture.SecureConfiguration,
                 EnvironmentUrl = connectionManager.Connection.EnvironmentUrl,
                 AccessToken = accessToken,
-                // A fresh process per debug session needs no refresh channel for v1 (see the Plugin
-                // Debugging Phase 2 plan's "Deferred" section) — an hour is comfortably longer than any
-                // realistic build+attach+step-through window.
+                // A fresh process per debug session needs no refresh channel — an hour is comfortably
+                // longer than any realistic build+attach+step-through window.
                 AccessTokenExpiresOnUtc = DateTime.UtcNow.AddHours(1),
             };
 
@@ -163,7 +162,6 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
             }
 
             ReportResult(prompts, result);
-            await OfferRestoreTracingAsync(client, prompts, connectionManager.Connection.EnvironmentUrl).ConfigureAwait(true);
         }
 
         /// <summary>The assembly name segment of an assembly-qualified type name ("Namespace.Class, AssemblyName, Version=...") — null if entry.TypeName didn't have one (shouldn't happen for a real plugintracelog row, but this is best-effort, not load-bearing).</summary>
@@ -227,35 +225,10 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
             var message = $"D365: Debug session finished. {result.SandboxedWrites.Count} write(s) were sandboxed (not sent to Dataverse).";
             if (result.UndecodedProfileEntries.Count > 0)
             {
-                message += $" {result.UndecodedProfileEntries.Count} profile entr{(result.UndecodedProfileEntries.Count == 1 ? "y" : "ies")} could not be decoded — see the two-tier graceful-degradation policy in the Plugin Debugging Phase 2 plan.";
+                message += $" {result.UndecodedProfileEntries.Count} profile entr{(result.UndecodedProfileEntries.Count == 1 ? "y" : "ies")} could not be decoded.";
             }
 
             prompts.ShowInfo(message);
-        }
-
-        /// <summary>Offers to restore the org's prior tracing setting, if "Debug This Step..." changed it to arm this capture — offered exactly once per environment, regardless of the answer (see TracingRestoreStore's own doc comment).</summary>
-        private static async Task OfferRestoreTracingAsync(DataverseClient client, IUserPrompts prompts, string environmentUrl)
-        {
-            var prior = TracingRestoreStore.TryGetPriorSetting(environmentUrl);
-            if (prior == null) { return; }
-
-            TracingRestoreStore.Clear(environmentUrl);
-
-            var restore = await prompts.ConfirmAsync(
-                "D365: Restore plugin trace logging?",
-                $"Plugin trace logging was turned on to arm this capture. Restore it to its previous setting ({prior.Value}) now?").ConfigureAwait(true);
-
-            if (!restore) { return; }
-
-            try
-            {
-                var settingInfo = await client.GetPluginTraceLogSettingAsync().ConfigureAwait(true);
-                await client.SetPluginTraceLogSettingAsync(settingInfo.OrganizationId, prior.Value).ConfigureAwait(true);
-            }
-            catch (Exception ex)
-            {
-                prompts.ShowError($"D365: Failed to restore plugin trace logging: {ex.Message}");
-            }
         }
     }
 }

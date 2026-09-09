@@ -4,8 +4,8 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.PluginDebugging
 {
     /// <summary>
     /// Everything PluginCaptureHostLauncher needs to start a replay session — assembled by
-    /// DebugPluginCaptureCommand/DebugStepCommand from a built project, a fetched PluginTraceLogCapture,
-    /// and the active connection, before the launcher ever touches disk or a process.
+    /// DebugPluginCaptureCommand from a built project, a fetched PluginTraceLogCapture, and the active
+    /// connection, before the launcher ever touches disk or a process.
     /// </summary>
     internal sealed class ResolvedPluginCapture
     {
