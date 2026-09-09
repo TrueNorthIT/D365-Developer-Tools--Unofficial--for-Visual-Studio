@@ -29,6 +29,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
     {
         public string StepId { get; set; }
         public string Name { get; set; }
+        public string PluginTypeId { get; set; }
         public string SdkMessageId { get; set; }
         public string MessageName { get; set; }
 
@@ -178,11 +179,20 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
             [2] = "Both",
         };
 
+        /// <summary>plugintracelog's operationtype option set — which kind of registered component produced the trace.</summary>
+        private static readonly Dictionary<int, string> OperationTypes = new Dictionary<int, string>
+        {
+            [1] = "Plugin",
+            [2] = "Classic Workflow",
+            [3] = "Workflow Activity",
+        };
+
         public static string IsolationMode(int value) => IsolationModes.TryGetValue(value, out var label) ? label : value.ToString();
         public static string SourceType(int value) => SourceTypes.TryGetValue(value, out var label) ? label : value.ToString();
         public static string Stage(int value) => Stages.TryGetValue(value, out var label) ? label : value.ToString();
         public static string Mode(int value) => Modes.TryGetValue(value, out var label) ? label : value.ToString();
         public static string ImageType(int value) => ImageTypes.TryGetValue(value, out var label) ? label : value.ToString();
+        public static string OperationType(int value) => OperationTypes.TryGetValue(value, out var label) ? label : value.ToString();
 
         /// <summary>The three stages a step can actually be registered against (the rest are internal-only/deprecated).</summary>
         public static readonly IReadOnlyList<PluginOption> RegisterableStages = new List<PluginOption>

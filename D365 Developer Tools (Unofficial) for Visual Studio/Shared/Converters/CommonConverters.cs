@@ -25,6 +25,24 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared.Converters
             throw new NotSupportedException();
     }
 
+    /// <summary>
+    /// The inverse of Dialogs\EmptyToCollapsedConverter — shows an element only while its paired value is
+    /// empty. Used for a ghost-text placeholder overlaid on a filter TextBox (e.g. Plugin Debugging's
+    /// trace log filters): a real, hit-test-invisible TextBlock bound to the same property this converts,
+    /// rather than a VisualBrush-based watermark style, since a VisualBrush.Visual subtree is painted,
+    /// not part of the real visual tree — a RelativeSource binding inside one can't see back out to the
+    /// TextBox to read a per-instance placeholder (e.g. a Tag), which is why this is a plain overlay
+    /// instead. Saves the vertical space a separate label row would need.
+    /// </summary>
+    internal sealed class EmptyToVisibleConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+            string.IsNullOrEmpty(value as string) ? Visibility.Visible : Visibility.Collapsed;
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+            throw new NotSupportedException();
+    }
+
     /// <summary>Flips a bool — used to enable the "Enable"/"Disable" step commands opposite each other.</summary>
     internal sealed class InverseBoolConverter : IValueConverter
     {

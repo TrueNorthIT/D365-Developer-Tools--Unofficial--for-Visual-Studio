@@ -242,7 +242,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
             var queryParts = new List<string>
             {
                 "$select=sdkmessageprocessingstepid,name,stage,mode,rank,statecode,filteringattributes,description,configuration," +
-                    "_sdkmessageid_value,_sdkmessagefilterid_value,_impersonatinguserid_value,_sdkmessageprocessingstepsecureconfigid_value",
+                    "_plugintypeid_value,_sdkmessageid_value,_sdkmessagefilterid_value,_impersonatinguserid_value,_sdkmessageprocessingstepsecureconfigid_value",
                 $"$filter={filter}",
             };
             if (orderBy != null) { queryParts.Add(orderBy); }
@@ -265,6 +265,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
                 {
                     StepId = s.SdkMessageProcessingStepId,
                     Name = s.Name,
+                    PluginTypeId = s.PluginTypeIdValue,
                     SdkMessageId = s.SdkMessageIdValue,
                     MessageName = s.SdkMessageIdValue != null && messageNames.TryGetValue(s.SdkMessageIdValue, out var messageName) ? messageName : null,
                     SdkMessageFilterId = s.SdkMessageFilterIdValue,
@@ -820,6 +821,128 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse
         {
             var url = $"{RecordUrl("sdkmessageprocessingsteps", stepId)}/impersonatinguserid/$ref";
             using (await SendAsync(url, HttpMethod.Delete, null, null, HttpStatusCode.NotFound).ConfigureAwait(false)) { }
+        }
+
+        // ── Plugin trace logs ────────────────────────────────────────────────
+
+        /// <summary>
+        /// Queries plugintracelogs for one bounded, newest-first page. Deliberately does NOT use
+        /// FetchPagedAsync&lt;T&gt; — that follows every @odata.nextLink unconditionally, which is fine
+        /// for bounded metadata sets but would hang the UI against a busy org's trace log table.
+        /// filter.Top caps the page size instead; PluginTraceLogPage.NextLink is retained for a future
+        /// "Load more" affordance, not wired into the v1 UI.
+        /// </summary>
+        public async Task<PluginTraceLogPage> GetPluginTraceLogsAsync(PluginTraceLogFilter filter)
+        {
+            var filters = new List<string>();
+
+            // plugintracelog.typename is confirmed (against a live environment) to hold the *assembly-
+            // qualified* type name ("Namespace.Class, AssemblyName, Version=..., Culture=..., PublicKeyToken=...")
+            // — not the bare class name plugintype.typename holds (what Plugin Explorer surfaces). An
+            // eq comparison against the bare name therefore never matches; startswith against the bare
+            // name plus a trailing ", " anchors it as an exact type-name prefix rather than a fuzzy
+            // substring match. Dataverse's Web API supports startswith/contains/endswith in $filter
+            // (unlike tolower/toupper/etc., which it doesn't), so this doesn't need a client-side fallback.
+            if (!string.IsNullOrEmpty(filter.TypeName)) { filters.Add($"startswith(typename,'{EscapeODataLiteral(filter.TypeName)}, ')"); }
+            if (!string.IsNullOrEmpty(filter.PrimaryEntity)) { filters.Add($"primaryentity eq '{EscapeODataLiteral(filter.PrimaryEntity)}'"); }
+            if (!string.IsNullOrEmpty(filter.MessageName)) { filters.Add($"messagename eq '{EscapeODataLiteral(filter.MessageName)}'"); }
+            if (!string.IsNullOrEmpty(filter.CorrelationId)) { filters.Add($"correlationid eq '{filter.CorrelationId}'"); }
+            if (filter.From.HasValue) { filters.Add($"createdon ge {filter.From.Value:yyyy-MM-ddTHH:mm:ssZ}"); }
+            if (filter.To.HasValue) { filters.Add($"createdon le {filter.To.Value:yyyy-MM-ddTHH:mm:ssZ}"); }
+            if (filter.ExceptionsOnly) { filters.Add("exceptiondetails ne null"); }
+
+            // The corrected, verified signal for "can this row be debugged" — see PluginTraceLogFilter
+            // and PluginTraceLogEntry.PersistenceKey's doc comments. This filters server-side without
+            // ever selecting the (potentially large) profile column itself.
+            if (filter.HasCapturedProfile) { filters.Add("profile ne null"); }
+
+            var queryParts = new List<string>
+            {
+                "$select=plugintracelogid,typename,messagename,primaryentity,performanceexecutionduration," +
+                    "exceptiondetails,messageblock,createdon,correlationid,depth,mode,operationtype," +
+                    "persistencekey",
+                "$orderby=createdon desc",
+                $"$top={filter.Top}",
+            };
+            if (filters.Count > 0) { queryParts.Add($"$filter={string.Join(" and ", filters)}"); }
+
+            var url = ApiUrl("plugintracelogs", queryParts.ToArray());
+
+            // A direct RequestAsync (not FetchPagedAsync) — see the method summary above.
+            var page = await RequestAsync<ODataResponse<PluginTraceLogDto>>(url).ConfigureAwait(false);
+
+            return new PluginTraceLogPage
+            {
+                Items = (page?.Value ?? new List<PluginTraceLogDto>()).Select(MapTraceLog).ToList(),
+                NextLink = page?.NextLink,
+            };
+        }
+
+        private static PluginTraceLogEntry MapTraceLog(PluginTraceLogDto t) => new PluginTraceLogEntry
+        {
+            TraceLogId = t.PluginTraceLogId,
+            TypeName = t.TypeName,
+            MessageName = t.MessageName,
+            PrimaryEntity = t.PrimaryEntity,
+            PerformanceExecutionDuration = t.PerformanceExecutionDuration,
+            ExceptionDetails = t.ExceptionDetails,
+            MessageBlock = t.MessageBlock,
+            CreatedOn = t.CreatedOn,
+            CorrelationId = t.CorrelationId,
+            Depth = t.Depth,
+            ModeValue = t.Mode,
+            Mode = PluginOptionLabels.Mode(t.Mode),
+            OperationTypeValue = t.OperationType,
+            OperationType = PluginOptionLabels.OperationType(t.OperationType),
+            PersistenceKey = t.PersistenceKey,
+            HasProfilingData = !string.IsNullOrEmpty(t.PersistenceKey),
+        };
+
+        /// <summary>Reads the org's tracing level so the UI can warn "tracing is off" instead of showing a confusing empty list.</summary>
+        public async Task<PluginTraceLogSettingsInfo> GetPluginTraceLogSettingAsync()
+        {
+            var orgId = _connectionManager.Connection.WhoAmI.OrganizationId;
+            var url = $"{RecordUrl("organizations", orgId)}?$select=organizationid,plugintracelogsetting";
+            var org = await RequestAsync<OrganizationTraceSettingDto>(url).ConfigureAwait(false);
+
+            return org == null
+                ? null
+                : new PluginTraceLogSettingsInfo { OrganizationId = org.OrganizationId, Setting = (PluginTraceLogSetting)org.PluginTraceLogSetting };
+        }
+
+        /// <summary>Changes the org-wide tracing level — the same write the Plugin Registration Tool's "Settings" dialog performs. Also how Plugin Debugging's own tracing-level dropdown works (see PluginDebuggingViewModel.SetTracingLevelAsync) — Start/Stop Profiling deliberately never calls this itself (see the Plugin Debugging plan's history — an earlier iteration auto-toggled it and auto-restored the prior value on Stop, but a manual, always-visible dropdown the user controls directly turned out simpler and less surprising).</summary>
+        public Task SetPluginTraceLogSettingAsync(string organizationId, PluginTraceLogSetting setting) =>
+            UpdateRecordAsync("organizations", organizationId, new { plugintracelogsetting = (int)setting });
+
+        /// <summary>
+        /// Toggles sdkmessageprocessingstep's own genuine, native "enablepluginprofiler" boolean — the
+        /// real per-step server-side mechanism Start/Stop Profiling arms, confirmed live against a real
+        /// org: flipping this true on a step causes Dataverse itself to populate plugintracelog.profile
+        /// for that step's subsequent executions (once the org's own tracing level is at least "All" —
+        /// see PluginTraceLogSetting/the tracing-level dropdown), producing exactly the MC-NBFX capture
+        /// format ProfileEnvelopeReader/NbfxEntryDecoder/ProfileContextBuilder already decode. This is
+        /// completely independent of the separate, unrelated "Plug-in Profiler" managed solution
+        /// (mbs_pluginprofile/PluginProfiler.Plugins.ProfilerPlugin) — no wrapper step, no custom entity,
+        /// no third-party install of any kind. This is the actual mechanism the Plugin Registration
+        /// Tool's own "Start/Stop Profiling" uses.
+        /// </summary>
+        public Task SetStepProfilingEnabledAsync(string stepId, bool enabled) =>
+            UpdateRecordAsync("sdkmessageprocessingsteps", stepId, new { enablepluginprofiler = enabled });
+
+        /// <summary>
+        /// Fetches the full captured execution data for one trace log row — only ever called on demand
+        /// (e.g. "Debug This"), never as part of the bounded list query above or its auto-refresh
+        /// polling. Returns a capture with both fields null if the row simply has no data recorded
+        /// (not an error) — callers should treat a null/empty ProfileBase64 as "nothing to debug here."
+        /// </summary>
+        public async Task<PluginTraceLogCapture> GetPluginTraceLogCaptureAsync(string traceLogId)
+        {
+            var url = $"{RecordUrl("plugintracelogs", traceLogId)}?$select=profile,secureconfiguration";
+            var dto = await RequestAsync<PluginTraceLogCaptureDto>(url).ConfigureAwait(false);
+
+            return dto == null
+                ? null
+                : new PluginTraceLogCapture { ProfileBase64 = dto.Profile, SecureConfiguration = dto.SecureConfiguration };
         }
 
         // ── Internals ────────────────────────────────────────────────────────

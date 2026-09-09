@@ -46,6 +46,16 @@
         </Style.Triggers>
     </Style>
 
+    <!--
+        WPF's implicit-style lookup matches an element's EXACT runtime type, not its base type — a Style
+        keyed to TextBoxBase (never directly instantiated by anything in this app) was never actually
+        being applied to a real TextBox at all. This BasedOn chain is what actually makes every plain
+        <TextBox> in this app pick up the styling above — the entity/message/search filter boxes, the
+        LoadError/LastQueryDescription/LastProfileQueryDescription read-only boxes, the trace/exception
+        detail panes, all of it. (RichTextBox, if this app ever uses one, would need the same treatment.)
+    -->
+    <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBoxBase}}" />
+
     <Style TargetType="{x:Type PasswordBox}">
         <Setter Property="Background" Value="{DynamicResource {x:Static vsp:CommonControlsColors.TextBoxBackgroundBrushKey}}" />
         <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:CommonControlsColors.TextBoxTextBrushKey}}" />
@@ -62,6 +72,170 @@
 
     <Style TargetType="{x:Type CheckBox}">
         <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:CommonControlsColors.CheckBoxTextBrushKey}}" />
+    </Style>
+
+    <!-- DatePicker's outer chrome. Scoped to the closed-state boxes only (the actual visible issue) —
+         the popup calendar itself (Calendar/CalendarItem/CalendarDayButton) isn't themed here: a full,
+         correct re-theme of it needs its own ControlTemplate surgery this file can't verify without
+         visually testing it, unlike the property-setter-only fixes below. -->
+    <Style TargetType="{x:Type DatePicker}">
+        <Setter Property="Background" Value="{DynamicResource {x:Static vsp:CommonControlsColors.TextBoxBackgroundBrushKey}}" />
+        <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:CommonControlsColors.TextBoxTextBrushKey}}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource {x:Static vsp:CommonControlsColors.TextBoxBorderBrushKey}}" />
+    </Style>
+
+    <!-- DatePicker's own internal text-entry part is a distinct control type (DatePickerTextBox), not a
+         plain TextBox — it doesn't pick up the TextBoxBase style above automatically. -->
+    <Style TargetType="{x:Type DatePickerTextBox}">
+        <Setter Property="Background" Value="{DynamicResource {x:Static vsp:CommonControlsColors.TextBoxBackgroundBrushKey}}" />
+        <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:CommonControlsColors.TextBoxTextBrushKey}}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource {x:Static vsp:CommonControlsColors.TextBoxBorderBrushKey}}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <!-- First use of ComboBox in this extension (Plugin Debugging's trace-logging-level dropdown).
+         Unlike Button/TextBoxBase above, plain Background/Foreground/BorderBrush setters are NOT enough
+         for ComboBox — its default (Aero2/generic) ControlTemplate renders the dropdown toggle button and
+         arrow glyph from the OS theme's own fixed chrome, mostly ignoring those properties, so a real
+         ControlTemplate override is required the same way every other themed control here gets one
+         (implicitly, via TemplateBinding, since none of the others needed a custom template until now).
+         Reuses the same TextBox-family brush keys as TextBoxBase (closed box) and the same
+         ComboBoxListBackground/BorderBrushKey pair ListBox already uses successfully (open dropdown),
+         plus the Button family's hover/pressed brushes for the toggle chrome — all proven-compiling
+         elsewhere in this file, rather than guessing at ComboBox-specific member names. -->
+    <Style TargetType="{x:Type ComboBox}">
+        <Setter Property="Background" Value="{DynamicResource {x:Static vsp:CommonControlsColors.TextBoxBackgroundBrushKey}}" />
+        <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:CommonControlsColors.TextBoxTextBrushKey}}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource {x:Static vsp:CommonControlsColors.TextBoxBorderBrushKey}}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="4,2" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ComboBox}">
+                    <Grid>
+                        <ToggleButton x:Name="ToggleButton"
+                                      Background="{TemplateBinding Background}"
+                                      BorderBrush="{TemplateBinding BorderBrush}"
+                                      BorderThickness="{TemplateBinding BorderThickness}"
+                                      ClickMode="Press"
+                                      Focusable="False"
+                                      IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="{x:Type ToggleButton}">
+                                    <Border x:Name="Chrome"
+                                            Background="{TemplateBinding Background}"
+                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                            BorderThickness="{TemplateBinding BorderThickness}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="20" />
+                                            </Grid.ColumnDefinitions>
+                                            <Path Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Data="M 0 0 L 4 4 L 8 0 Z" Fill="{TemplateBinding Foreground}" />
+                                        </Grid>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource {x:Static vsp:CommonControlsColors.ButtonHoverBrushKey}}" />
+                                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource {x:Static vsp:CommonControlsColors.ButtonBorderHoverBrushKey}}" />
+                                        </Trigger>
+                                        <Trigger Property="IsPressed" Value="True">
+                                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource {x:Static vsp:CommonControlsColors.ButtonPressedBrushKey}}" />
+                                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource {x:Static vsp:CommonControlsColors.ButtonBorderPressedBrushKey}}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+                        <ContentPresenter x:Name="ContentSite"
+                                          Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="Left" VerticalAlignment="Center"
+                                          Content="{TemplateBinding SelectionBoxItem}"
+                                          ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                          ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                          IsHitTestVisible="False" />
+                        <Popup x:Name="Popup" AllowsTransparency="True" Focusable="False"
+                               IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" PopupAnimation="Slide">
+                            <Grid x:Name="DropDown" MinWidth="{TemplateBinding ActualWidth}"
+                                  MaxHeight="{TemplateBinding MaxDropDownHeight}" SnapsToDevicePixels="True">
+                                <Border Background="{DynamicResource {x:Static vsp:CommonControlsColors.ComboBoxListBackgroundBrushKey}}"
+                                        BorderBrush="{DynamicResource {x:Static vsp:CommonControlsColors.ComboBoxListBorderBrushKey}}"
+                                        BorderThickness="1" />
+                                <ScrollViewer Margin="2" SnapsToDevicePixels="True">
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
+                                </ScrollViewer>
+                            </Grid>
+                        </Popup>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="ToggleButton" Property="Background" Value="{DynamicResource {x:Static vsp:CommonControlsColors.ButtonDisabledBrushKey}}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The dropdown's own item list — same ListItem brush keys ListBoxItem above already uses. -->
+    <Style TargetType="{x:Type ComboBoxItem}">
+        <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:CommonDocumentColors.ListItemTextBrushKey}}" />
+        <Setter Property="Padding" Value="4,2" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource {x:Static vsp:CommonDocumentColors.ListItemBackgroundHoverBrushKey}}" />
+                <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:CommonDocumentColors.ListItemTextHoverBrushKey}}" />
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="{DynamicResource {x:Static vsp:CommonDocumentColors.ListItemBackgroundSelectedBrushKey}}" />
+                <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:CommonDocumentColors.ListItemTextSelectedBrushKey}}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- First use of TabControl in this extension (Plugin Debugging's "Trace Logs"/"Profile Captures"
+         tabs). This is the real, dominant fix for "the whole tab content area is still light" — WPF's
+         default TabControl template paints its content-hosting Border with a plain TemplateBinding to
+         Background, and with nothing setting that, every child control inside either tab sat on that
+         default (light) chrome regardless of its own theming, however correct. A simple property setter
+         is enough here (no ControlTemplate override needed) since the default template already reads
+         Background via TemplateBinding for exactly this area. -->
+    <Style TargetType="{x:Type TabControl}">
+        <Setter Property="Background" Value="{DynamicResource {x:Static vsp:EnvironmentColors.ToolWindowBackgroundBrushKey}}" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+    <!-- The tab headers themselves ("Trace Logs"/"Profile Captures") — reuses the same HeaderColors keys
+         DataGridColumnHeader below already uses successfully, since a tab header is visually the same
+         kind of clickable header chrome. Needs a real ControlTemplate (unlike TabControl above) since the
+         selected/unselected visual states aren't simple property setters. -->
+    <Style TargetType="{x:Type TabItem}">
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type TabItem}">
+                    <Border x:Name="Border" BorderThickness="0" Background="{DynamicResource {x:Static vsp:HeaderColors.DefaultBrushKey}}">
+                        <ContentPresenter x:Name="ContentSite" ContentSource="Header"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Margin="{TemplateBinding Padding}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="{DynamicResource {x:Static vsp:HeaderColors.MouseOverBrushKey}}" />
+                            <Setter TargetName="ContentSite" Property="TextElement.Foreground" Value="{DynamicResource {x:Static vsp:HeaderColors.MouseOverTextBrushKey}}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="{DynamicResource {x:Static vsp:EnvironmentColors.ToolWindowBackgroundBrushKey}}" />
+                            <Setter TargetName="ContentSite" Property="TextElement.Foreground" Value="{DynamicResource {x:Static vsp:EnvironmentColors.ToolWindowTextBrushKey}}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="False">
+                            <Setter TargetName="ContentSite" Property="TextElement.Foreground" Value="{DynamicResource {x:Static vsp:HeaderColors.DefaultTextBrushKey}}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style TargetType="{x:Type ListBox}">
@@ -90,6 +264,76 @@
         <Setter Property="Background" Value="{DynamicResource {x:Static vsp:TreeViewColors.BackgroundBrushKey}}" />
         <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:TreeViewColors.BackgroundTextBrushKey}}" />
         <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+    <!-- First use of DataGrid in this extension (Plugin Debugging's trace log grid) — every other
+         list surface (Entity Explorer, Plugin Explorer) is a TreeView. Mirrors the TreeView/TreeViewItem
+         selection-brush pattern above, plus HeaderColors for the column headers. -->
+    <Style TargetType="{x:Type DataGrid}">
+        <Setter Property="Background" Value="{DynamicResource {x:Static vsp:TreeViewColors.BackgroundBrushKey}}" />
+        <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:TreeViewColors.BackgroundTextBrushKey}}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="RowBackground" Value="Transparent" />
+        <Setter Property="AlternatingRowBackground" Value="Transparent" />
+        <Setter Property="GridLinesVisibility" Value="Horizontal" />
+        <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource {x:Static vsp:CommonControlsColors.ButtonBorderBrushKey}}" />
+        <Setter Property="HeadersVisibility" Value="Column" />
+        <Setter Property="AutoGenerateColumns" Value="False" />
+        <Setter Property="CanUserAddRows" Value="False" />
+        <Setter Property="CanUserDeleteRows" Value="False" />
+        <Setter Property="IsReadOnly" Value="True" />
+    </Style>
+
+    <Style TargetType="{x:Type DataGridColumnHeader}">
+        <Setter Property="Background" Value="{DynamicResource {x:Static vsp:HeaderColors.DefaultBrushKey}}" />
+        <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:HeaderColors.DefaultTextBrushKey}}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource {x:Static vsp:HeaderColors.SeparatorLineBrushKey}}" />
+        <Setter Property="BorderThickness" Value="0,0,1,1" />
+        <Setter Property="Padding" Value="6,3" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource {x:Static vsp:HeaderColors.MouseOverBrushKey}}" />
+                <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:HeaderColors.MouseOverTextBrushKey}}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style TargetType="{x:Type DataGridRow}">
+        <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:TreeViewColors.BackgroundTextBrushKey}}" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource {x:Static vsp:TreeViewColors.DragOverItemBrushKey}}" />
+            </Trigger>
+            <!-- DataGridRow has no IsSelectionActive property of its own (unlike TreeViewItem/ListBoxItem
+                 above) — it relies on the attached Selector.IsSelectionActive from the hosting DataGrid. -->
+            <MultiTrigger>
+                <MultiTrigger.Conditions>
+                    <Condition Property="IsSelected" Value="True" />
+                    <Condition Property="Selector.IsSelectionActive" Value="True" />
+                </MultiTrigger.Conditions>
+                <Setter Property="Background" Value="{DynamicResource {x:Static vsp:TreeViewColors.SelectedItemActiveBrushKey}}" />
+                <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:TreeViewColors.SelectedItemActiveTextBrushKey}}" />
+            </MultiTrigger>
+            <MultiTrigger>
+                <MultiTrigger.Conditions>
+                    <Condition Property="IsSelected" Value="True" />
+                    <Condition Property="Selector.IsSelectionActive" Value="False" />
+                </MultiTrigger.Conditions>
+                <Setter Property="Background" Value="{DynamicResource {x:Static vsp:TreeViewColors.SelectedItemInactiveBrushKey}}" />
+                <Setter Property="Foreground" Value="{DynamicResource {x:Static vsp:TreeViewColors.SelectedItemInactiveTextBrushKey}}" />
+            </MultiTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style TargetType="{x:Type DataGridCell}">
+        <Setter Property="Padding" Value="6,3" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Style.Triggers>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="Transparent" />
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <Style TargetType="{x:Type TreeViewItem}">

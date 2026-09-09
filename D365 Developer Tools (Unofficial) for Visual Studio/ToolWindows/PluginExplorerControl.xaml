@@ -30,11 +30,18 @@
             <MenuItem Header="Add Step..." Click="OnAddStepClick" />
             <MenuItem Header="Unregister..." Click="OnUnregisterTypeClick" />
         </ContextMenu>
-        <ContextMenu x:Key="StepContextMenu">
+        <!-- Start/Stop Profiling visibility is toggled imperatively in OnStepContextMenuOpened (code-behind)
+             rather than bound — a ContextMenu is a separate visual-tree root, so its own items don't
+             inherit the row's DataContext the way TryGetRowDataContext's PlacementTarget workaround
+             already has to account for elsewhere in this file. -->
+        <ContextMenu x:Key="StepContextMenu" Opened="OnStepContextMenuOpened">
             <MenuItem Header="Edit Step..." Click="OnEditStepClick" />
             <MenuItem Header="Enable" Click="OnEnableStepClick" IsEnabled="{Binding IsEnabled, Converter={StaticResource InverseBoolConverter}}" />
             <MenuItem Header="Disable" Click="OnDisableStepClick" IsEnabled="{Binding IsEnabled}" />
             <MenuItem Header="Add Image..." Click="OnAddImageClick" />
+            <MenuItem Header="View Trace Logs..." Click="OnViewStepTraceLogsClick" />
+            <MenuItem Header="Start Profiling..." Click="OnStartProfilingClick" />
+            <MenuItem Header="Stop Profiling..." Click="OnStopProfilingClick" />
             <MenuItem Header="Unregister..." Click="OnUnregisterStepClick" />
         </ContextMenu>
         <ContextMenu x:Key="ImageContextMenu">
@@ -75,11 +82,15 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <img:CrispImage Grid.Column="0" Width="16" Height="16" Margin="0,0,4,0" VerticalAlignment="Center" Moniker="{x:Static catalog:KnownMonikers.Event}" />
                 <TextBlock Grid.Column="1" Text="{Binding Summary}" TextTrimming="CharacterEllipsis"
                            ToolTip="{Binding FilteringAttributes}" />
-                <TextBlock Grid.Column="2" Margin="6,0,0,0" Opacity="0.6" FontSize="10" Text="{Binding Mode}" />
+                <TextBlock Grid.Column="2" Margin="6,0,0,0" Foreground="#2D7DD2" FontSize="11" Text="●" VerticalAlignment="Center"
+                           ToolTip="Currently profiling — a Plug-in Profiler wrapper is standing in for this step"
+                           Visibility="{Binding IsProfiling, Converter={StaticResource BoolToVisibleConverter}}" />
+                <TextBlock Grid.Column="3" Margin="6,0,0,0" Opacity="0.6" FontSize="10" Text="{Binding Mode}" />
             </Grid>
         </HierarchicalDataTemplate>
 
@@ -221,9 +232,11 @@
                     <RowDefinition Height="1*" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Margin="8,4" TextWrapping="Wrap"
-                           Foreground="{DynamicResource {x:Static vsp:EnvironmentColors.ToolWindowValidationErrorTextBrushKey}}"
-                           Text="{Binding LoadError}" Visibility="{Binding LoadError, Converter={StaticResource EmptyToCollapsedConverter}}" />
+                <!-- A TextBox (not TextBlock) so the error text — e.g. a raw Dataverse API error
+                     response — can actually be selected and copied. -->
+                <TextBox Grid.Row="0" Margin="8,4" TextWrapping="Wrap" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                         Foreground="{DynamicResource {x:Static vsp:EnvironmentColors.ToolWindowValidationErrorTextBrushKey}}"
+                         Text="{Binding LoadError, Mode=OneWay}" Visibility="{Binding LoadError, Converter={StaticResource EmptyToCollapsedConverter}}" />
                 <TextBlock Grid.Row="0" Margin="8,4" Text="Loading plugin assemblies…"
                            Visibility="{Binding IsLoadingAssemblies, Converter={StaticResource BoolToVisibleConverter}}" />
 
@@ -251,9 +264,9 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" Margin="8,4" TextWrapping="Wrap"
-                               Foreground="{DynamicResource {x:Static vsp:EnvironmentColors.ToolWindowValidationErrorTextBrushKey}}"
-                               Text="{Binding CustomApisLoadError}" Visibility="{Binding CustomApisLoadError, Converter={StaticResource EmptyToCollapsedConverter}}" />
+                    <TextBox Grid.Row="0" Margin="8,4" TextWrapping="Wrap" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                             Foreground="{DynamicResource {x:Static vsp:EnvironmentColors.ToolWindowValidationErrorTextBrushKey}}"
+                             Text="{Binding CustomApisLoadError, Mode=OneWay}" Visibility="{Binding CustomApisLoadError, Converter={StaticResource EmptyToCollapsedConverter}}" />
                     <TextBlock Grid.Row="0" Margin="8,4" Text="Loading Custom APIs…"
                                Visibility="{Binding IsLoadingCustomApis, Converter={StaticResource BoolToVisibleConverter}}" />
 

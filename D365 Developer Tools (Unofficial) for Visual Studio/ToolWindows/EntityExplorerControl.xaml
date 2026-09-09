@@ -127,9 +127,11 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Margin="8,4" TextWrapping="Wrap"
-                           Foreground="{DynamicResource {x:Static vsp:EnvironmentColors.ToolWindowValidationErrorTextBrushKey}}"
-                           Text="{Binding LoadError}" Visibility="{Binding LoadError, Converter={StaticResource EmptyToCollapsedConverter}}" />
+                <!-- A TextBox (not TextBlock) so the error text — e.g. a raw Dataverse API error
+                     response — can actually be selected and copied. -->
+                <TextBox Grid.Row="0" Margin="8,4" TextWrapping="Wrap" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                         Foreground="{DynamicResource {x:Static vsp:EnvironmentColors.ToolWindowValidationErrorTextBrushKey}}"
+                         Text="{Binding LoadError, Mode=OneWay}" Visibility="{Binding LoadError, Converter={StaticResource EmptyToCollapsedConverter}}" />
                 <TextBlock Grid.Row="0" Margin="8,4" Text="Loading entities…"
                            Visibility="{Binding IsLoadingEntities, Converter={StaticResource BoolToVisibleConverter}}" />
 

@@ -20,6 +20,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
                 MenuChild.Separator,
                 MenuChild.Command<ShowEntityExplorerCommand>(),
                 MenuChild.Command<ShowPluginExplorerCommand>(),
+                MenuChild.Command<ShowPluginDebuggingCommand>(),
             },
         };
     }

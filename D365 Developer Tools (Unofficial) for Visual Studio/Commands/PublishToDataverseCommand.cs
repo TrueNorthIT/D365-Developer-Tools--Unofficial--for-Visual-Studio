@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Dataverse;
+using D365_Developer_Tools__Unofficial__for_Visual_Studio.PluginDebugging;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.PluginPublishing;
 using D365_Developer_Tools__Unofficial__for_Visual_Studio.Shared;
 using EnvDTE;
@@ -60,7 +61,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
                 var existingAssembly = await client.FindPluginAssemblyByNameAsync(assemblyName).ConfigureAwait(true);
                 if (existingAssembly != null)
                 {
-                    await UpdateAssemblyAsync(client, prompts, existingAssembly, assemblyPath, assemblyName, contentBase64, version).ConfigureAwait(true);
+                    await UpdateAssemblyAsync(client, prompts, existingAssembly, project.FullName, assemblyPath, assemblyName, contentBase64, version).ConfigureAwait(true);
                     return;
                 }
 
@@ -79,12 +80,12 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
             }
         }
 
-        private static async Task UpdateAssemblyAsync(DataverseClient client, IUserPrompts prompts, PluginRecordRef existing, string assemblyPath, string assemblyName, string contentBase64, string version)
+        private static async Task UpdateAssemblyAsync(DataverseClient client, IUserPrompts prompts, PluginRecordRef existing, string projectFilePath, string assemblyPath, string assemblyName, string contentBase64, string version)
         {
             await prompts.RunWithProgressAsync($"D365: Publishing '{assemblyName}'…", async () =>
             {
                 await client.UpdatePluginAssemblyContentAsync(existing.Id, contentBase64, version).ConfigureAwait(true);
-                await RegisterNewPluginTypesAsync(client, existing.Id, assemblyPath, solutionUniqueName: null, assemblyName, version).ConfigureAwait(true);
+                await RegisterNewPluginTypesAsync(client, existing.Id, projectFilePath, assemblyPath, solutionUniqueName: null, assemblyName, version).ConfigureAwait(true);
             }).ConfigureAwait(true);
 
             prompts.ShowInfo($"D365: Published '{assemblyName}' (updated existing plugin assembly).");
@@ -120,7 +121,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
                 await prompts.RunWithProgressAsync($"D365: Publishing '{assemblyName}'…", async () =>
                 {
                     newAssemblyId = await client.CreatePluginAssemblyAsync(assemblyName, contentBase64, version, solutionUniqueName).ConfigureAwait(true);
-                    await RegisterNewPluginTypesAsync(client, newAssemblyId, assemblyPath, solutionUniqueName, assemblyName, version).ConfigureAwait(true);
+                    await RegisterNewPluginTypesAsync(client, newAssemblyId, projectFilePath, assemblyPath, solutionUniqueName, assemblyName, version).ConfigureAwait(true);
                 }).ConfigureAwait(true);
 
                 prompts.ShowInfo($"D365: Published '{assemblyName}' as a new plugin assembly.");
@@ -136,7 +137,7 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
         }
 
         /// <summary>Scans the built assembly for IPlugin and custom-workflow-activity (CodeActivity) types and registers any not already present in Dataverse. Never removes existing plugin types.</summary>
-        private static async Task RegisterNewPluginTypesAsync(DataverseClient client, string pluginAssemblyId, string assemblyPath, string solutionUniqueName, string assemblyName, string version)
+        private static async Task RegisterNewPluginTypesAsync(DataverseClient client, string pluginAssemblyId, string projectFilePath, string assemblyPath, string solutionUniqueName, string assemblyName, string version)
         {
             var discovered = PluginTypeScanner.FindPluginTypes(assemblyPath);
             if (discovered.Count == 0) { return; }
@@ -149,6 +150,11 @@ namespace D365_Developer_Tools__Unofficial__for_Visual_Studio.Commands
 
             foreach (var type in discovered)
             {
+                // Every discovered type gets mapped for Plugin Debugging's "Debug This" — regardless of
+                // whether it's newly registered here or already existed — so any project published
+                // through this extension needs no extra prompting to find its own source later.
+                DebugTargetStore.SetProjectPath(type.TypeName, projectFilePath);
+
                 if (existingTypeNames.Contains(type.TypeName)) { continue; }
                 await client.CreatePluginTypeAsync(
                     pluginAssemblyId, type.TypeName, type.FriendlyName, solutionUniqueName,
